@@ -2,7 +2,7 @@
 
 生成 3:4 Google Classic MD3 电商产品图
 
-Image Gen 生成空背景，产品、固定 50° 二维投影、源 Logo 和 Roboto Bold 文字在本地合成
+Image Gen 生成空背景，产品、固定 50° 二维投影、源 Logo 和 Rubik Variable（默认字重 700）文字在本地合成
 
 母版由用户锁定，SKU 成功后自动写入成品目录
 

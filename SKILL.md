@@ -1,6 +1,6 @@
 ---
 name: md3-product-image
-description: "Create portrait 3:4 Google Classic MD3 e-commerce product images with Image Gen backgrounds and locally composited product images, fixed 2D shadows, Logo, and Roboto Bold text. Use for product main images, user-locked masters, or automatic locked-layout SKU variants and SKU redos."
+description: "Create portrait 3:4 Google Classic MD3 e-commerce product images with Image Gen backgrounds and locally composited product images, fixed 2D shadows, Logo, and Rubik Variable text. Use for product main images, user-locked masters, or automatic locked-layout SKU variants and SKU redos."
 ---
 
 # MD3 Product Image
@@ -36,7 +36,7 @@ Each user generation instruction permits exactly one Image Gen call and one full
 
 ### 1. Measure or reuse
 
-For the first master, run `scripts/measure_text.py` with the authoritative product, Logo, complete product name, `--title-lines`, `--title-line-1`, optional `--title-line-2` and `--version`, and `--output-root`. Always use bundled `assets/Roboto-Bold.ttf`.
+For the first master, run `scripts/measure_text.py` with the authoritative product, Logo, complete product name, `--title-lines`, `--title-line-1`, optional `--title-line-2` and `--version`, and `--output-root`. Always use bundled `assets/Rubik[wght].ttf` with `--font-weight 700`.
 
 The script creates `PRODUCT_DIRECTORY/reusable/layout.json`, the cropped Logo, and title/version masks. If the layout already exists, reuse it. Stop if the source identity conflicts with its recorded hashes; never silently replace reusable assets.
 
@@ -125,7 +125,7 @@ For a new SKU after any redo, omit `--redo`; assign the next unused label normal
 
 ## Preserve local composition
 
-Add the exact source Logo, user-supplied title lines, and optional version in that order. Preserve their artwork, characters, spacing, proportions, and alpha. Use only proportional Logo scaling and Roboto Bold text. Keep the manually selected line count and title text unchanged.
+Add the exact source Logo, user-supplied title lines, and optional version in that order. Preserve their artwork, characters, spacing, proportions, and alpha. Use only proportional Logo scaling and Rubik Variable text. Keep the manually selected line count and title text unchanged.
 
 Use visible product height 54% and right margin 12%. For aspect ratio `>= 1.35`, use maximum width 68% and bottom margin 18%. For aspect ratio `< 0.90`, use maximum width 52% and bottom margin 12%. Otherwise use maximum width 52% and bottom margin 18%. Use shadow angle 50°, offset 16% of product height, blur radius 0.7% of canvas height, and opacity 28%.
 
