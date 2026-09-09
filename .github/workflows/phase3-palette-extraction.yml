@@ -9,6 +9,7 @@ on:
       - 'scripts/palette_cache.py'
       - 'scripts/test_extract_palette.py'
       - 'scripts/test_palette_cache.py'
+      - 'scripts/test_prompt_structure.py'
       - 'references/image-gen-prompt.txt'
       - 'references/replace-variant-block.md'
       - 'SKILL.md'
