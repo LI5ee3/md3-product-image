@@ -1,6 +1,6 @@
 # Phase 6 — Model and Quality Runtime Policy Results
 
-Status: **COMPLETED / RUNTIME CONTROLS ENUMERATED**
+Status: **C0 COMPLETE / C1 REFERENCE-ISOLATION PENDING**
 
 Date: 2026-09-10
 
@@ -32,11 +32,9 @@ The real Work + Skill Image Gen callable interface does **not** expose directly 
 
 No enum values or defaults for those concepts are available to the Skill because no callable parameters are exposed.
 
-This confirms the Phase 4 finding from another angle: the current Work Skill surface does not expose an explicit edit action/mode selector.
+This independently aligns with Phase 4: the current Work Skill surface does not expose an explicit edit action/mode selector.
 
 ## Controls explicitly exposed
-
-The callable interface exposes only these relevant controls:
 
 ### `prompt`
 
@@ -45,8 +43,6 @@ type: string
 required callable argument
 directly_settable_by_skill: true
 ```
-
-The production Skill already constructs the complete prompt deterministically and passes it verbatim.
 
 ### `num_last_images_to_include`
 
@@ -58,14 +54,6 @@ tool guidance maximum: 5
 
 The callable declaration did not expose a default value or a complete allowed range.
 
-For deterministic reference isolation, production calls should explicitly use:
-
-```text
-num_last_images_to_include = 0
-```
-
-rather than allowing recent conversation images to be included implicitly.
-
 ### `referenced_image_paths`
 
 ```text
@@ -73,47 +61,32 @@ type: array<string> | null
 directly_settable_by_skill: true
 ```
 
-Production must use explicit local reference paths only:
-
-MASTER:
-
-```text
-[palette-reference.png]
-```
-
-SKU:
-
-```text
-[ORIGINAL_MASTER_BACKGROUND.png, current-SKU-palette-reference.png]
-```
-
-The complete product/SKU artwork remains local and must not be listed in `referenced_image_paths`.
-
-## Production decision
+## C0 decision
 
 There is no valid model/quality/size/background/output-format ablation to run on the current Work Skill surface because those variables are not callable controls.
 
 Do not hard-code or document unsupported public-API parameters as production Skill behavior.
 
-The only Phase 6 production change is reference-context isolation:
+No model or quality A/B follows C0.
+
+## C1 requirement
+
+Before adopting explicit conversation-image isolation in production, validate one real call with:
 
 ```text
-prompt = deterministic scene prompt
 num_last_images_to_include = 0
-referenced_image_paths = exact explicit authority list
+referenced_image_paths = [deterministic palette-reference.png]
 ```
 
-This strengthens the Phase 3 palette-only contract by preventing recent conversation images from being implicitly included in the Image Gen call.
+using the real HUAWEI black source to construct the palette reference locally.
 
-## No visual A/B required
+C1 exists because the C0 callable declaration exposed `integer | null` and a maximum, but did not declare a full allowed range or default. The project will not assume that zero is accepted until the real Work call proves it.
 
-No model or quality A/B follows C0 because there is no model or quality control to vary.
+If C1 passes, production MASTER/SKU calls can explicitly use zero recent conversation images and exact `referenced_image_paths`, strengthening the Phase 3 palette-only contract.
 
-The reference-context change does not alter the accepted structured prompt, palette extraction, local composition, raster contract, or master/SKU reference roles. It makes the intended reference set explicit at the callable boundary.
+If C1 fails, the project records the limitation and does not claim strict recent-image isolation.
 
-A final end-to-end production smoke test belongs in Phase 7 after all accepted deterministic changes are consolidated.
-
-## Final decision
+## Current decision
 
 ```text
 Runtime control schema: CONFIRMED
@@ -127,5 +100,5 @@ Prompt configurable: YES
 Recent conversation-image inclusion configurable: YES
 Explicit reference-image paths configurable: YES
 Run model/quality A/B: NO
-Adopt explicit reference-context isolation: YES
+Adopt num_last_images_to_include=0: PENDING C1
 ```
