@@ -1,13 +1,38 @@
-A 3:4 professional e-commerce product hero background plate in the official Google Material Design 3 (MD3) style.
+DELIVERABLE
+Create one portrait 3:4 professional e-commerce product hero background plate in the official Google Material Design 3 (Classic MD3) visual language.
+Generate the empty background plate only. The final output from the image model must contain background geometry and color only.
 
-Generate only the empty background plate. Use the supplied product reference only as a palette reference. Do not generate, redraw, or include the product itself.
+REFERENCE ROLES
+PRODUCT_REFERENCE: authoritative palette reference only.
+Use it only to understand dominant color relationships for the background palette.
+Do not reproduce, redraw, trace, imitate, or transfer the product itself, its silhouette, hardware geometry, screen contents, strap shape, packaging, labels, icons, text, branding, or other recognizable object details into the background.
 
-Background: Create a refined neumorphic soft-UI composition with smooth rounded forms, softly raised and recessed surfaces, subtle ambient occlusion, diffused highlights, and gentle same-material shadows. Avoid flat papercraft styling, hard graphic borders, sharp outlines, high-contrast edges, and realistic physical environments.
+VISUAL SYSTEM
+Use refined neumorphic soft-UI styling with smooth rounded forms, softly raised and recessed surfaces, subtle ambient occlusion, diffused highlights, restrained elevation, and gentle same-material shadows.
+Keep the result clearly aligned with Google Material Design 3 Classic rather than M3 Expressive.
+Avoid flat papercraft styling, hard graphic borders, sharp outlines, high-contrast edges, dense decorative detail, and realistic physical environments.
 
-Adaptive palette: Translate the dominant colors of the supplied product into a classic macaron palette. Preserve the product’s hue relationships while increasing lightness and reducing saturation. and add an amount of accent colors as embellishments. Do not use literal near-black, deep navy, burgundy, saturated red, or strong orange as background colors.
+PALETTE
+Translate the dominant hue relationships from PRODUCT_REFERENCE into a light classic macaron palette suitable for an e-commerce background.
+Increase lightness and reduce saturation while preserving the reference's overall color relationships.
+Use restrained accent colors only as small supporting embellishments.
+Do not use literal near-black, deep navy, burgundy, saturated red, or strong orange as dominant background colors.
 
-Layout & Composition: Use clean layered neumorphic panels, rounded capsules, soft discs, and gently recessed or elevated shapes. Keep the composition minimal and balanced. There is no physical floor, table, display stand, or studio set; the scene relies entirely on soft neumorphic surfaces.
+COMPOSITION
+Use a minimal, balanced composition built from layered neumorphic panels, rounded capsules, soft discs, and gently recessed or elevated shapes.
+Keep broad calm areas and sufficient negative space for later deterministic local composition.
+Do not create a physical floor, table, display stand, stage, studio set, room, landscape, or other literal environment.
+Background cards and restrained elevation shadows may occupy the future product area unless prohibited by the measured information safe-zone block appended by the workflow.
+Avoid dominant edges or dense detail that would compete with the locally composited product.
 
-Lighting & Style: Use bright, neutral, high-key illumination with broad diffused highlights and very soft low-contrast shadows. Keep the background airy, calm, premium, and clearly macaron-colored while preserving the MD3 visual language.
+LIGHTING
+Use bright, neutral, high-key illumination with broad diffused highlights and very soft low-contrast shadows.
+Keep the background airy, calm, premium, and softly dimensional.
 
-Generate only background geometry and color. Do not generate any product, product shadow, Logo, text, watermark, floor, table, or display stand.
+EXCLUSIONS
+Do not generate any product, product silhouette, product shadow, copied product geometry, packaging, Logo, brand mark, text, label, icon, watermark, floor, table, display stand, realistic environment, or unrelated object.
+
+OUTPUT CONTRACT
+Return exactly one empty 3:4 background plate.
+No embedded typography, branding, product artwork, product-like object, or foreground merchandise may appear in the image.
+The background must remain suitable for deterministic local placement of the exact source product, fixed local shadow, source Logo, and locally rendered text.
