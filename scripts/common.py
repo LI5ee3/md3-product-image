@@ -4,6 +4,8 @@ import hashlib
 import json
 from pathlib import Path
 
+from PIL import Image
+
 
 def sha256_file(path: Path) -> str:
     digest = hashlib.sha256()
@@ -36,6 +38,65 @@ def atomic_write(path: Path, data, *, new: bool = False) -> None:
         temporary.replace(path)
     finally:
         temporary.unlink(missing_ok=True)
+
+
+def raster_info(path: Path) -> dict[str, int | str]:
+    try:
+        with Image.open(path) as image:
+            image.load()
+            width, height = image.size
+            mode = image.mode
+    except OSError as exc:
+        raise ValueError(f"RASTER_UNREADABLE: {path}: {exc}") from exc
+    if width <= 0 or height <= 0:
+        raise ValueError(f"RASTER_DIMENSIONS_INVALID: {path}")
+    return {
+        "width": width,
+        "height": height,
+        "ratio": "3:4" if width * 4 == height * 3 else f"{width}:{height}",
+        "mode": mode,
+    }
+
+
+def require_three_four_raster(path: Path, label: str) -> dict[str, int | str]:
+    info = raster_info(path)
+    width = int(info["width"])
+    height = int(info["height"])
+    if width * 4 != height * 3:
+        raise ValueError(f"{label}_NOT_3_4: got {width}x{height}")
+    return info
+
+
+def normalize_raster_contract(value, label: str) -> dict[str, int | str]:
+    if not isinstance(value, dict):
+        raise ValueError(f"{label}_INVALID")
+    try:
+        width = int(value["width"])
+        height = int(value["height"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"{label}_INVALID") from exc
+    if width <= 0 or height <= 0 or width * 4 != height * 3:
+        raise ValueError(f"{label}_INVALID")
+    return {"width": width, "height": height, "ratio": "3:4"}
+
+
+def require_matching_raster(
+    path: Path,
+    expected,
+    label: str,
+) -> dict[str, int | str]:
+    contract = normalize_raster_contract(expected, "EXPECTED_RASTER")
+    actual = require_three_four_raster(path, label)
+    if (
+        int(actual["width"]) != int(contract["width"])
+        or int(actual["height"]) != int(contract["height"])
+    ):
+        raise ValueError(
+            f"{label}_RASTER_MISMATCH: expected "
+            f"{contract['width']}x{contract['height']}, got "
+            f"{actual['width']}x{actual['height']}"
+        )
+    return actual
 
 
 def verify_information_assets(layout: dict, reusable_dir: Path) -> None:
@@ -93,4 +154,21 @@ def verify_master(product_dir: Path) -> dict:
     }
     for label, path in expected.items():
         resolve_entry(manifest["files"].get(label), product_dir, path, label)
+
+    if manifest.get("raster") is None:
+        raster = require_three_four_raster(expected["background"], "MASTER_BACKGROUND")
+        raster_contract = {
+            "width": int(raster["width"]),
+            "height": int(raster["height"]),
+            "ratio": "3:4",
+        }
+        manifest = dict(manifest)
+        manifest["raster"] = raster_contract
+    else:
+        raster_contract = normalize_raster_contract(manifest["raster"], "MASTER_RASTER")
+        manifest = dict(manifest)
+        manifest["raster"] = raster_contract
+
+    for label in ("background", "product", "shadow", "scene", "final"):
+        require_matching_raster(expected[label], raster_contract, f"MASTER_{label.upper()}")
     return manifest
