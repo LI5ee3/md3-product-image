@@ -1,6 +1,6 @@
 # Phase 4 — Constrained SKU Background Edit
 
-Status: **IN PROGRESS / C0 RUNTIME PROBE NEXT**
+Status: **COMPLETED / NOT ADOPTED**
 
 Date: 2026-09-09
 
@@ -8,17 +8,17 @@ Date: 2026-09-09
 
 Determine whether the real ChatGPT Work + Skill runtime can invoke a genuine existing-image edit for SKU palette changes, instead of regenerating a new background while using the locked MASTER only as a composition reference.
 
-No production SKU behavior changes until this runtime gate passes.
+No production SKU behavior was allowed to change until this runtime gate passed.
 
 ## Public capability evidence
 
 Current OpenAI Images 2.5 documentation confirms that image editing exists in both ChatGPT Images and the API. In the Responses API image-generation tool, `action: "edit"` can force editing when an image is in context.
 
-This does not prove that the Work Skill surface exposes the same explicit control. Phase 4 therefore tests the actual Work runtime instead of assuming API parity.
+This does not prove that the Work Skill surface exposes the same explicit control. Phase 4 therefore tested the actual Work runtime instead of assuming API parity.
 
 ## Authority state
 
-Continue from the accepted Phase 3 palette-only product state:
+The Phase 4 probe continued from the accepted Phase 3 palette-only product state:
 
 - product: `HUAWEI WATCH FIT 5 Pro`
 - locked palette-only MASTER: Gate B1 PASS
@@ -28,79 +28,70 @@ Continue from the accepted Phase 3 palette-only product state:
 
 ## C0 — Edit-interface proof
 
-C0 tests one orange palette edit and does not create or replace a production SKU output.
+C0 tested whether one orange palette change could be executed through a distinct existing-image edit operation without creating or replacing a production SKU output.
 
 ### Inputs
 
-1. `ORIGINAL_MASTER_BACKGROUND.png` — editable target
+1. `ORIGINAL_MASTER_BACKGROUND.png` — intended editable target
 2. deterministic orange SKU `palette-reference.png` — color-only supporting reference
 3. `references/phase4-edit-probe.txt` — exact edit contract
 
-The complete orange product artwork remains local and must not be sent to the image model.
+The complete orange product artwork remained local and was not sent to the image model.
 
 ### Required runtime behavior
 
-The Work agent must invoke a distinct existing-image edit operation.
+The Work agent was required to invoke a distinct existing-image edit operation.
 
-If the callable image surface exposes an explicit action/mode selector, use the edit value.
+If the callable image surface exposed an explicit action/mode selector, it had to use the edit value.
 
-If Work cannot distinguish an edit operation from normal generation/reference-image generation, stop with:
+If Work could not distinguish an edit operation from normal generation/reference-image generation, it had to stop with:
 
 ```text
 IMAGE_EDIT_INTERFACE_UNAVAILABLE
 ```
 
-Do not silently substitute the Phase 3 regeneration path.
+It was forbidden to silently substitute the Phase 3 regeneration path.
 
-### C0 output
+### C0 result
 
-Return for review:
+The real Work + Skill probe returned:
 
-- original `ORIGINAL_MASTER_BACKGROUND.png`,
-- raw edited orange background,
-- the exact edit prompt used,
-- any runtime/tool metadata that explicitly identifies the operation as edit, if exposed,
-- diagnostic structure metrics from `scripts/compare_background_structure.py`.
+```text
+IMAGE_EDIT_INTERFACE_UNAVAILABLE
+```
 
-The structure metric is evidence only. It must never auto-accept or auto-reject visual quality.
+The callable Image Gen surface exposed ordinary generation capability but no explicit existing-image edit operation or equivalent verifiable edit selector.
 
-## C1 / C2 — Visual SKU edit ablation
+Per contract, the probe stopped before any image-model operation.
 
-Run only if C0 proves genuine edit semantics.
+No production SKU or MASTER file was generated, modified, or replaced.
 
-### C1
+## C1 / C2 — Not executed
 
-Orange SKU using the edit path.
+C1 orange edit and C2 white edit were not run because C0 did not prove genuine edit semantics.
 
-### C2
+Running visual ablations without a verified edit operation would not distinguish constrained editing from ordinary regeneration and therefore would not be valid evidence.
 
-White SKU using the edit path.
+## Decision rule outcome
 
-Compare against the accepted Phase 3 regeneration outputs on:
+The Phase 4 adoption criteria were not met because requirement 1 failed:
 
-- composition drift,
-- palette harmony,
-- background quality,
-- safe-zone cleanliness,
-- unwanted geometry changes,
-- accidental generated objects/text/Logo,
-- actual raster consistency.
+1. real Work edit semantics demonstrated rather than inferred — **FAIL**
+2. orange and white edits visually acceptable — **NOT TESTED**
+3. composition drift materially lower than Phase 3 regeneration — **NOT TESTED**
+4. no deterministic contract regression — **PASS / unchanged**
+5. one user generation instruction causes only one image-model operation — **PASS / zero model operations after gate failure**
 
-## Decision rule
+Decision:
 
-Adopt constrained edit only if:
+```text
+Adopt constrained SKU edit: NO
+Retain Phase 3 regeneration path: YES
+```
 
-1. real Work edit semantics are demonstrated rather than inferred,
-2. orange and white edits both remain visually acceptable,
-3. composition drift is materially lower than the Phase 3 regeneration path,
-4. no deterministic contract regresses,
-5. one user generation instruction still causes only one image-model operation.
+## Production status after Phase 4
 
-Otherwise retain the accepted Phase 3 regeneration path.
-
-## Production status during Phase 4
-
-Current production candidate remains:
+The accepted production path remains:
 
 ```text
 MASTER:
@@ -111,4 +102,10 @@ SKU:
   -> Image Gen background regeneration with master composition reference
 ```
 
-Phase 4 is an ablation only until all gates pass.
+The authoritative product artwork remains local and is not sent to Image Gen for palette transfer.
+
+## Reopen condition
+
+Phase 4 may be reopened only if the Work/Skill runtime later exposes an explicit edit operation or equivalent edit semantics that can be verified directly.
+
+Detailed result evidence is recorded in `docs/phase-4/RESULTS.md`.
