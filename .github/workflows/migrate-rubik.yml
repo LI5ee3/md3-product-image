@@ -54,14 +54,12 @@ jobs:
                   raise SystemExit(f'{path}: expected one match, found {count}: {old!r}')
               p.write_text(text.replace(old, new), encoding='utf-8')
 
-          # README: user-facing font description.
           replace_once(
               'README.md',
               'Image Gen 生成空背景，产品、固定 50° 二维投影、源 Logo 和 Roboto Bold 文字在本地合成',
               'Image Gen 生成空背景，产品、固定 50° 二维投影、源 Logo 和 Rubik Variable（默认字重 700）文字在本地合成',
           )
 
-          # SKILL: authoritative bundled-font policy.
           p = Path('SKILL.md')
           text = p.read_text(encoding='utf-8')
           required = [
@@ -83,7 +81,6 @@ jobs:
           )
           p.write_text(text, encoding='utf-8')
 
-          # measure_text.py: load the variable weight deterministically.
           replace_once(
               'scripts/measure_text.py',
               'FONT_DEFAULT = Path(__file__).resolve().parent.parent / "assets" / "Roboto-Bold.ttf"',
@@ -144,7 +141,6 @@ jobs:
               '    parser.add_argument("--font-path", default=str(FONT_DEFAULT))\n    parser.add_argument("--font-weight", type=int, default=FONT_WEIGHT_DEFAULT)\n',
           )
 
-          # Exercise real Cyrillic text and default Rubik weight in the end-to-end test.
           replace_once(
               'scripts/test_workflow.py',
               '            "--version", "Pro",\n',
@@ -172,8 +168,6 @@ jobs:
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md SKILL.md scripts/measure_text.py scripts/test_workflow.py assets/OFL.txt 'assets/Rubik[wght].ttf'
-          git rm --cached --ignore-unmatch assets/Roboto-Bold.ttf >/dev/null 2>&1 || true
-          git add -u assets/Roboto-Bold.ttf
+          git add -A
           git commit -m 'feat: switch bundled font to Rubik Variable'
           git push
