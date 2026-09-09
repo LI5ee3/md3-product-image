@@ -37,14 +37,28 @@ jobs:
       - name: Verify fixture count and manifest
         run: |
           test -f docs/phase-0/fixtures/manifest.json
-          test "$(find docs/phase-0/fixtures -maxdepth 1 -name '*.png' | wc -l)" -eq 8
           python - <<'PY'
           import json
           from pathlib import Path
-          manifest = json.loads(Path('docs/phase-0/fixtures/manifest.json').read_text())
-          assert len(manifest['fixtures']) == 7
-          assert len({item['id'] for item in manifest['fixtures']}) == 7
-          print('Phase 0 fixture manifest verified')
+
+          root = Path('docs/phase-0/fixtures')
+          manifest = json.loads((root / 'manifest.json').read_text())
+          fixtures = manifest['fixtures']
+          assert len(fixtures) == 7
+          assert len({item['id'] for item in fixtures}) == 7
+
+          expected_pngs = 1
+          for item in fixtures:
+              if 'master_product' in item and 'sku_product' in item:
+                  expected_pngs += 2
+              elif 'product' in item:
+                  expected_pngs += 1
+              else:
+                  raise AssertionError(f"Fixture {item['id']} has no product files")
+
+          actual_pngs = len(list(root.glob('*.png')))
+          assert actual_pngs == expected_pngs, (actual_pngs, expected_pngs)
+          print(f'Phase 0 fixture manifest verified: {actual_pngs} PNG files')
           PY
 
       - name: Commit generated fixtures
