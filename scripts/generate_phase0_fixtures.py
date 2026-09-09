@@ -16,49 +16,56 @@ SPECS = [
         "coverage": ["light products"],
         "shape": "rounded",
         "bbox": [210, 130, 558, 900],
-        "colors": ["#E9EEF3", "#F8FAFC", "#C9D3DD"],
+        "master_colors": ["#E9EEF3", "#F8FAFC", "#C9D3DD"],
+        "sku_colors": ["#F1E5D8", "#FFF8F0", "#D9C3AE"],
     },
     {
         "id": "dark-product",
         "coverage": ["dark products"],
         "shape": "rounded",
         "bbox": [190, 150, 578, 890],
-        "colors": ["#202124", "#3C4043", "#5F6368"],
+        "master_colors": ["#202124", "#3C4043", "#5F6368"],
+        "sku_colors": ["#24202B", "#433A4B", "#665C70"],
     },
     {
         "id": "saturated-product",
         "coverage": ["saturated products"],
         "shape": "rounded",
         "bbox": [205, 145, 563, 895],
-        "colors": ["#1565C0", "#00ACC1", "#7B1FA2"],
+        "master_colors": ["#1565C0", "#00ACC1", "#7B1FA2"],
+        "sku_colors": ["#D81B60", "#F4511E", "#8E24AA"],
     },
     {
         "id": "low-saturation-product",
         "coverage": ["low-saturation products"],
         "shape": "rounded",
         "bbox": [200, 140, 568, 900],
-        "colors": ["#A8B0B8", "#C4B8B0", "#B7C1B2"],
+        "master_colors": ["#A8B0B8", "#C4B8B0", "#B7C1B2"],
+        "sku_colors": ["#B5AFA7", "#C7C0B8", "#AEB9BB"],
     },
     {
         "id": "wide-product",
         "coverage": ["wide products"],
         "shape": "wide",
         "bbox": [70, 350, 698, 720],
-        "colors": ["#5C6BC0", "#90CAF9", "#283593"],
+        "master_colors": ["#5C6BC0", "#90CAF9", "#283593"],
+        "sku_colors": ["#43A047", "#A5D6A7", "#1B5E20"],
     },
     {
         "id": "tall-product",
         "coverage": ["tall products"],
         "shape": "tall",
         "bbox": [270, 55, 498, 955],
-        "colors": ["#26A69A", "#80CBC4", "#00796B"],
+        "master_colors": ["#26A69A", "#80CBC4", "#00796B"],
+        "sku_colors": ["#7E57C2", "#B39DDB", "#512DA8"],
     },
     {
         "id": "multi-dominant-color",
         "coverage": ["products with multiple dominant colors"],
         "shape": "multicolor",
         "bbox": [170, 145, 598, 895],
-        "colors": ["#4285F4", "#EA4335", "#FBBC05", "#34A853"],
+        "master_colors": ["#4285F4", "#EA4335", "#FBBC05", "#34A853"],
+        "sku_colors": ["#00ACC1", "#EC407A", "#FFCA28", "#7CB342"],
     },
 ]
 
@@ -67,11 +74,10 @@ def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def draw_product(spec: dict) -> Image.Image:
+def draw_product(spec: dict, colors: list[str]) -> Image.Image:
     image = Image.new("RGBA", CANVAS, (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
     left, top, right, bottom = spec["bbox"]
-    colors = spec["colors"]
     radius = max(24, min(right - left, bottom - top) // 9)
 
     if spec["shape"] in {"rounded", "tall"}:
@@ -101,7 +107,7 @@ def draw_product(spec: dict) -> Image.Image:
         )
     elif spec["shape"] == "multicolor":
         draw.rounded_rectangle((left, top, right, bottom), radius=radius, fill=colors[0])
-        band_h = (bottom - top) // 4
+        band_h = (bottom - top) // len(colors)
         for index, color in enumerate(colors):
             y0 = top + index * band_h
             y1 = bottom if index == len(colors) - 1 else top + (index + 1) * band_h
@@ -138,14 +144,19 @@ def main() -> None:
 
     fixtures = []
     for spec in SPECS:
-        product_path = out / f"{spec['id']}.png"
-        draw_product(spec).save(product_path, "PNG", optimize=False)
+        master_path = out / f"{spec['id']}-master.png"
+        sku_path = out / f"{spec['id']}-sku.png"
+        draw_product(spec, spec["master_colors"]).save(master_path, "PNG", optimize=False)
+        draw_product(spec, spec["sku_colors"]).save(sku_path, "PNG", optimize=False)
         fixtures.append(
             {
                 "id": spec["id"],
                 "coverage": spec["coverage"],
-                "product": product_path.name,
-                "product_sha256": sha256(product_path),
+                "master_product": master_path.name,
+                "master_product_sha256": sha256(master_path),
+                "sku_product": sku_path.name,
+                "sku_product_sha256": sha256(sku_path),
+                "geometry_contract": "MASTER and SKU use identical alpha mask and geometry; palette differs only",
                 "logo": logo_path.name,
                 "logo_sha256": sha256(logo_path),
                 "complete_name": f"Phase 0 {spec['id']}",
@@ -158,9 +169,10 @@ def main() -> None:
         )
 
     manifest = {
-        "schema": 1,
-        "purpose": "fixed deterministic visual-evaluation inputs for Images 2.5 migration",
+        "schema": 2,
+        "purpose": "fixed deterministic paired MASTER/SKU visual-evaluation inputs for Images 2.5 migration",
         "generator": "scripts/generate_phase0_fixtures.py",
+        "pairing_policy": "Within each fixture, MASTER and SKU keep identical geometry and differ only in deterministic palette values.",
         "fixtures": fixtures,
     }
     manifest_path = out / "manifest.json"
