@@ -1,0 +1,179 @@
+name: One-time Rubik migration
+
+on:
+  push:
+    paths:
+      - .github/workflows/migrate-rubik.yml
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download and verify Rubik Variable
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -L --fail --retry 3 \
+            -o 'assets/Rubik[wght].ttf' \
+            'https://raw.githubusercontent.com/google/fonts/main/ofl/rubik/Rubik%5Bwght%5D.ttf'
+          curl -L --fail --retry 3 \
+            -o assets/OFL.txt \
+            'https://raw.githubusercontent.com/google/fonts/main/ofl/rubik/OFL.txt'
+          python - <<'PY'
+          import hashlib
+          from pathlib import Path
+
+          path = Path('assets/Rubik[wght].ttf')
+          data = path.read_bytes()
+          blob_sha = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
+          expected = 'a59aeb632df494345a542697c357f608875481b0'
+          if blob_sha != expected:
+              raise SystemExit(f'Rubik blob mismatch: {blob_sha} != {expected}')
+          print(f'Rubik verified: {len(data)} bytes, git blob {blob_sha}')
+          PY
+
+      - name: Patch font configuration and tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one match, found {count}: {old!r}')
+              p.write_text(text.replace(old, new), encoding='utf-8')
+
+          # README: user-facing font description.
+          replace_once(
+              'README.md',
+              'Image Gen 生成空背景，产品、固定 50° 二维投影、源 Logo 和 Roboto Bold 文字在本地合成',
+              'Image Gen 生成空背景，产品、固定 50° 二维投影、源 Logo 和 Rubik Variable（默认字重 700）文字在本地合成',
+          )
+
+          # SKILL: authoritative bundled-font policy.
+          p = Path('SKILL.md')
+          text = p.read_text(encoding='utf-8')
+          required = [
+              'Roboto Bold text',
+              'assets/Roboto-Bold.ttf',
+              'Use only proportional Logo scaling and Roboto Bold text.',
+          ]
+          for needle in required:
+              if needle not in text:
+                  raise SystemExit(f'SKILL.md: missing expected text: {needle}')
+          text = text.replace('Roboto Bold text', 'Rubik Variable text')
+          text = text.replace(
+              'Always use bundled `assets/Roboto-Bold.ttf`.',
+              'Always use bundled `assets/Rubik[wght].ttf` with `--font-weight 700`.',
+          )
+          text = text.replace(
+              'Use only proportional Logo scaling and Roboto Bold text.',
+              'Use only proportional Logo scaling and Rubik Variable text. Use weight 700 by default; change the weight only when the user explicitly requests it.',
+          )
+          p.write_text(text, encoding='utf-8')
+
+          # measure_text.py: load the variable weight deterministically.
+          replace_once(
+              'scripts/measure_text.py',
+              'FONT_DEFAULT = Path(__file__).resolve().parent.parent / "assets" / "Roboto-Bold.ttf"',
+              'FONT_DEFAULT = Path(__file__).resolve().parent.parent / "assets" / "Rubik[wght].ttf"\nFONT_WEIGHT_DEFAULT = 700',
+          )
+
+          replace_once(
+              'scripts/measure_text.py',
+              '''def mask_signature(font: ImageFont.FreeTypeFont, text: str) -> tuple:\n''',
+              '''def load_font(\n    font_path: Path, size: int, weight: int\n) -> ImageFont.FreeTypeFont:\n    font = ImageFont.truetype(str(font_path), size)\n    try:\n        axes = font.get_variation_axes()\n    except OSError:\n        axes = []\n    if axes:\n        if len(axes) != 1:\n            raise ValueError(\n                f"FONT_VARIATION_UNSUPPORTED: expected one axis, found {len(axes)}"\n            )\n        axis = axes[0]\n        minimum = int(axis["minimum"])\n        maximum = int(axis["maximum"])\n        if not minimum <= weight <= maximum:\n            raise ValueError(\n                f"FONT_WEIGHT_OUT_OF_RANGE: {weight} not in {minimum}..{maximum}"\n            )\n        font.set_variation_by_axes([weight])\n    return font\n\n\ndef mask_signature(font: ImageFont.FreeTypeFont, text: str) -> tuple:\n''',
+          )
+
+          replace_once(
+              'scripts/measure_text.py',
+              '''def check_glyph_coverage(font_path: Path, *texts: str) -> None:\n    """Reject characters rendered as the font's missing-glyph box."""\n    font = ImageFont.truetype(str(font_path), 96)\n''',
+              '''def check_glyph_coverage(font_path: Path, weight: int, *texts: str) -> None:\n    """Reject characters rendered as the font's missing-glyph box."""\n    font = load_font(font_path, 96, weight)\n''',
+          )
+
+          replace_once(
+              'scripts/measure_text.py',
+              '''def font_for_lines_height(\n    font_path: Path, lines: list[str], target_height: int\n) -> ImageFont.FreeTypeFont:\n    lo, hi = 1, max(16, target_height * 4)\n    candidates: list[tuple[int, int, ImageFont.FreeTypeFont]] = []\n    while lo <= hi:\n        size = (lo + hi) // 2\n        font = ImageFont.truetype(str(font_path), size)\n''',
+              '''def font_for_lines_height(\n    font_path: Path, lines: list[str], target_height: int, weight: int\n) -> ImageFont.FreeTypeFont:\n    lo, hi = 1, max(16, target_height * 4)\n    candidates: list[tuple[int, int, ImageFont.FreeTypeFont]] = []\n    while lo <= hi:\n        size = (lo + hi) // 2\n        font = load_font(font_path, size, weight)\n''',
+          )
+
+          replace_once(
+              'scripts/measure_text.py',
+              '    font_path: Path = field(default_factory=lambda: FONT_DEFAULT)\n',
+              '    font_path: Path = field(default_factory=lambda: FONT_DEFAULT)\n    font_weight: int = FONT_WEIGHT_DEFAULT\n',
+          )
+          replace_once(
+              'scripts/measure_text.py',
+              '    title_font = font_for_lines_height(opts.font_path, lines, target_height)\n',
+              '    title_font = font_for_lines_height(\n        opts.font_path, lines, target_height, opts.font_weight\n    )\n',
+          )
+          replace_once(
+              'scripts/measure_text.py',
+              '    opts = LayoutOptions(font_path=Path(args.font_path))\n',
+              '    opts = LayoutOptions(\n        font_path=Path(args.font_path), font_weight=args.font_weight\n    )\n',
+          )
+          replace_once(
+              'scripts/measure_text.py',
+              '''    check_glyph_coverage(\n        opts.font_path,\n        args.title_line_1,\n''',
+              '''    check_glyph_coverage(\n        opts.font_path,\n        opts.font_weight,\n        args.title_line_1,\n''',
+          )
+          replace_once(
+              'scripts/measure_text.py',
+              '''            [args.version],\n            round(opts.version_height_frac * height),\n        )\n''',
+              '''            [args.version],\n            round(opts.version_height_frac * height),\n            opts.font_weight,\n        )\n''',
+          )
+          replace_once(
+              'scripts/measure_text.py',
+              '        "font": {"path": str(opts.font_path), "name": "Roboto Bold"},\n',
+              '        "font": {\n            "path": str(opts.font_path),\n            "name": "Rubik Variable",\n            "weight": opts.font_weight,\n        },\n',
+          )
+          replace_once(
+              'scripts/measure_text.py',
+              '    parser.add_argument("--font-path", default=str(FONT_DEFAULT))\n',
+              '    parser.add_argument("--font-path", default=str(FONT_DEFAULT))\n    parser.add_argument("--font-weight", type=int, default=FONT_WEIGHT_DEFAULT)\n',
+          )
+
+          # Exercise real Cyrillic text and default Rubik weight in the end-to-end test.
+          replace_once(
+              'scripts/test_workflow.py',
+              '            "--version", "Pro",\n',
+              '            "--version", "Глобальная версия",\n',
+          )
+          replace_once(
+              'scripts/test_workflow.py',
+              '        assert report["title_lines"] == ["Pixel by", "Google"]\n',
+              '        assert report["title_lines"] == ["Pixel by", "Google"]\n        assert report["version"] == "Глобальная версия"\n        assert report["font"]["name"] == "Rubik Variable"\n        assert report["font"]["weight"] == 700\n',
+          )
+          PY
+
+      - name: Remove old Roboto asset
+        run: rm assets/Roboto-Bold.ttf
+
+      - name: Install test dependency
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Run workflow self-check
+        run: python scripts/test_workflow.py
+
+      - name: Commit migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add README.md SKILL.md scripts/measure_text.py scripts/test_workflow.py assets/OFL.txt 'assets/Rubik[wght].ttf'
+          git rm --cached --ignore-unmatch assets/Roboto-Bold.ttf >/dev/null 2>&1 || true
+          git add -u assets/Roboto-Bold.ttf
+          git commit -m 'feat: switch bundled font to Rubik Variable'
+          git push
