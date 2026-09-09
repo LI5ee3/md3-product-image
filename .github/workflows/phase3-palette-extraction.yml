@@ -6,7 +6,12 @@ on:
       - images-2.5-roadmap
     paths:
       - 'scripts/extract_palette.py'
+      - 'scripts/palette_cache.py'
       - 'scripts/test_extract_palette.py'
+      - 'scripts/test_palette_cache.py'
+      - 'references/image-gen-prompt.txt'
+      - 'references/replace-variant-block.md'
+      - 'SKILL.md'
       - '.github/workflows/phase3-palette-extraction.yml'
   workflow_dispatch:
 
@@ -26,10 +31,16 @@ jobs:
         run: python -m pip install --disable-pip-version-check pillow
 
       - name: Compile palette scripts
-        run: python -m py_compile scripts/extract_palette.py scripts/test_extract_palette.py
+        run: python -m py_compile scripts/extract_palette.py scripts/palette_cache.py scripts/test_extract_palette.py scripts/test_palette_cache.py scripts/test_prompt_structure.py
 
-      - name: Run deterministic palette self-check
+      - name: Run deterministic palette extraction self-check
         run: python scripts/test_extract_palette.py
+
+      - name: Run deterministic palette cache self-check
+        run: python scripts/test_palette_cache.py
+
+      - name: Run structured prompt self-check
+        run: python scripts/test_prompt_structure.py
 
       - name: Run existing deterministic workflow baseline
         run: python scripts/test_workflow.py
