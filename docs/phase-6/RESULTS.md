@@ -1,6 +1,6 @@
 # Phase 6 — Model and Quality Runtime Policy Results
 
-Status: **C0 COMPLETE / C1 REFERENCE-ISOLATION PENDING**
+Status: **C0 COMPLETE / C1 VALID FAILURE / C2 PENDING**
 
 Date: 2026-09-10
 
@@ -69,22 +69,64 @@ Do not hard-code or document unsupported public-API parameters as production Ski
 
 No model or quality A/B follows C0.
 
-## C1 requirement
+## C1 result — valid failure
 
-Before adopting explicit conversation-image isolation in production, validate one real call with:
+The isolated C1 probe executed exactly one Image Gen attempt with:
 
 ```text
 num_last_images_to_include = 0
+referenced_image_paths = [<TEMP_DIR>/palette-reference.png]
+```
+
+The complete HUAWEI `黑.png` source was used only for local deterministic palette extraction and was not listed in `referenced_image_paths`.
+
+The runtime rejected the invocation with:
+
+```text
+provide only one of `referenced_image_paths` or `num_last_images_to_include`
+```
+
+Returned conclusion:
+
+```text
+REFERENCE_ISOLATION_CALL_REJECTED
+```
+
+Observed effects:
+
+- `image_model_operations: 1` attempted call,
+- no generated background returned,
+- no fallback or retry,
+- no production MASTER/SKU file created or modified.
+
+### C1 interpretation
+
+The tested Work callable surface treats `referenced_image_paths` and `num_last_images_to_include` as mutually exclusive arguments.
+
+Therefore the previously proposed production contract:
+
+```text
+num_last_images_to_include = 0
+referenced_image_paths = exact authority list
+```
+
+is invalid and must not be adopted.
+
+Because this project requires deterministic, exact local reference files, the production-preferred selector is `referenced_image_paths`.
+
+## C2 requirement
+
+C2 must validate one real call with:
+
+```text
 referenced_image_paths = [deterministic palette-reference.png]
 ```
 
-using the real HUAWEI black source to construct the palette reference locally.
+while omitting `num_last_images_to_include` entirely from the invocation.
 
-C1 exists because the C0 callable declaration exposed `integer | null` and a maximum, but did not declare a full allowed range or default. The project will not assume that zero is accepted until the real Work call proves it.
+Do not pass zero or null.
 
-If C1 passes, production MASTER/SKU calls can explicitly use zero recent conversation images and exact `referenced_image_paths`, strengthening the Phase 3 palette-only contract.
-
-If C1 fails, the project records the limitation and does not claim strict recent-image isolation.
+If accepted, this becomes the callable-boundary production reference contract for MASTER and SKU operations.
 
 ## Current decision
 
@@ -97,8 +139,10 @@ Background mode configurable: NO
 Output format configurable: NO
 Explicit edit/action configurable: NO
 Prompt configurable: YES
-Recent conversation-image inclusion configurable: YES
+Recent conversation-image selector configurable: YES
 Explicit reference-image paths configurable: YES
+Both selectors may be combined: NO
 Run model/quality A/B: NO
-Adopt num_last_images_to_include=0: PENDING C1
+Adopt num_last_images_to_include=0: NO
+C2 explicit referenced_image_paths-only validation: PENDING
 ```
