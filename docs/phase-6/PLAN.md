@@ -1,6 +1,6 @@
 # Phase 6 — Model and Quality Runtime Policy
 
-Status: **IN PROGRESS / C0 COMPLETE / C1 REFERENCE-ISOLATION NEXT**
+Status: **IN PROGRESS / C0 COMPLETE / C1 REJECTED / C2 EXPLICIT-PATHS NEXT**
 
 Date: 2026-09-10
 
@@ -62,72 +62,109 @@ referenced_image_paths: array<string> | null
 
 The callable declaration did not expose defaults for these controls except that `prompt` is required; Work guidance reported a maximum of 5 for `num_last_images_to_include`.
 
-## C1 — Explicit reference-isolation call
+## C1 — Combined recent-image and explicit-path isolation
 
-C1 validates the only newly discovered production-relevant control before adoption.
-
-Use a fresh Work conversation with the isolated C1 Skill package and the real HUAWEI `黑.png` source.
-
-The complete `黑.png` remains a recent conversation image and is used locally only to build the deterministic palette reference.
-
-C1 then performs exactly one Image Gen call with:
+C1 used a fresh Work conversation and performed exactly one Image Gen attempt with:
 
 ```text
-prompt = exact C1 empty-background prompt
 num_last_images_to_include = 0
 referenced_image_paths = [deterministic palette-reference.png]
 ```
 
-The complete `黑.png` must not appear in `referenced_image_paths`.
+The runtime rejected the invocation with:
 
-### C1 acceptance
+```text
+provide only one of `referenced_image_paths` or `num_last_images_to_include`
+```
 
-C1 passes when:
-
-1. the callable Image Gen operation accepts `num_last_images_to_include=0`,
-2. the callable operation accepts the explicit local palette path in `referenced_image_paths`,
-3. exactly one image-model operation occurs,
-4. no fallback or retry occurs,
-5. the returned image is an empty background rather than an obvious copied HUAWEI WATCH product scene.
-
-Visual inspection is supporting evidence only; callable argument acceptance is the primary gate.
-
-If the call rejects the explicit controls, stop without retry and report:
+Result:
 
 ```text
 REFERENCE_ISOLATION_CALL_REJECTED
 ```
 
+This is valid runtime evidence. It proves these two controls are mutually exclusive on the tested Work Image Gen callable surface.
+
+No background was generated and no production MASTER/SKU file was created or modified.
+
+### C1 decision
+
+Do **not** set `num_last_images_to_include=0` together with `referenced_image_paths` in production.
+
+The project requires exact local reference files for its deterministic MASTER/SKU reference contract, so `referenced_image_paths` takes precedence.
+
+## C2 — Explicit reference-path mode
+
+C2 validates the production-relevant alternative selected after C1.
+
+Use a fresh Work conversation with the isolated C2 Skill package and the real HUAWEI `黑.png` source.
+
+The complete `黑.png` is used locally only to produce the deterministic `palette-reference.png` and must not be passed to Image Gen.
+
+Perform exactly one Image Gen call with:
+
+```text
+prompt = exact C2 empty-background prompt
+referenced_image_paths = [deterministic palette-reference.png]
+```
+
+Critically:
+
+```text
+num_last_images_to_include
+```
+
+must be **omitted entirely** from the callable invocation. Do not pass `0`, `null`, or any other value.
+
+The complete `黑.png` must not appear in `referenced_image_paths`.
+
+### C2 acceptance
+
+C2 passes when:
+
+1. the callable accepts explicit `referenced_image_paths` with `num_last_images_to_include` omitted,
+2. exactly one image-model operation occurs,
+3. no fallback or retry occurs,
+4. an accessible generated background is returned,
+5. the complete HUAWEI product source was not explicitly passed to Image Gen.
+
+If the call fails, stop without retry and report:
+
+```text
+EXPLICIT_REFERENCE_PATH_CALL_REJECTED
+```
+
 If the call succeeds, report:
 
 ```text
-REFERENCE_ISOLATION_CALL_ACCEPTED
+EXPLICIT_REFERENCE_PATH_CALL_ACCEPTED
 ```
 
-## Production decision after C1
+## Production decision after C2
 
-If C1 passes, production Image Gen calls should explicitly use:
+If C2 passes, the production callable contract becomes:
 
 ```text
-num_last_images_to_include = 0
+prompt = deterministic scene prompt
 referenced_image_paths = exact explicit authority list
+num_last_images_to_include = OMITTED
 ```
 
 MASTER:
 
 ```text
-[palette-reference.png]
+referenced_image_paths = [palette-reference.png]
 ```
 
 SKU:
 
 ```text
-[ORIGINAL_MASTER_BACKGROUND.png, current-SKU-palette-reference.png]
+referenced_image_paths = [ORIGINAL_MASTER_BACKGROUND.png, current-SKU-palette-reference.png]
 ```
 
-The complete product/SKU artwork remains local and must not be sent to Image Gen.
+The complete product/SKU artwork remains local and must not be listed in `referenced_image_paths`.
 
-If C1 fails, do not assume that zero recent-image inclusion can be enforced by the Skill; retain the current explicit reference-role instructions and record the runtime limitation.
+If C2 fails, record the limitation and do not claim explicit-path production control is valid.
 
 ## Model / quality decision
 
@@ -135,4 +172,4 @@ Do not write public API model names or unsupported quality/size/background/outpu
 
 Do not run model/quality A/B tests until the Work Skill runtime actually exposes such controls.
 
-Detailed C0 evidence is in `docs/phase-6/RESULTS.md`.
+Detailed evidence is in `docs/phase-6/RESULTS.md`.
