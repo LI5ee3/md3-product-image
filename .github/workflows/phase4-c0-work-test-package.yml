@@ -1,0 +1,60 @@
+name: Phase 4 C0 Work edit probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - images-2.5-roadmap
+    paths:
+      - 'docs/phase-4/WORK_TEST_SKILL_C0.md'
+      - 'docs/phase-4/openai-c0.yaml'
+      - 'references/phase4-edit-probe.txt'
+      - 'scripts/common.py'
+      - 'scripts/extract_palette.py'
+      - 'scripts/palette_cache.py'
+      - 'scripts/compare_background_structure.py'
+      - 'scripts/test_compare_background_structure.py'
+      - '.github/workflows/phase4-c0-work-test-package.yml'
+
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Compile probe scripts
+        run: python -m py_compile scripts/common.py scripts/extract_palette.py scripts/palette_cache.py scripts/compare_background_structure.py scripts/test_compare_background_structure.py
+
+      - name: Run structure metric self-check
+        run: python scripts/test_compare_background_structure.py
+
+      - name: Build C0 Work test package
+        run: |
+          set -euo pipefail
+          mkdir -p package/agents package/references package/scripts
+          cp docs/phase-4/WORK_TEST_SKILL_C0.md package/SKILL.md
+          cp docs/phase-4/openai-c0.yaml package/agents/openai.yaml
+          cp references/phase4-edit-probe.txt package/references/
+          cp scripts/common.py package/scripts/
+          cp scripts/extract_palette.py package/scripts/
+          cp scripts/palette_cache.py package/scripts/
+          cp scripts/compare_background_structure.py package/scripts/
+          (cd package && zip -r ../md3-product-image-phase4-c0-edit-probe.zip .)
+          unzip -l md3-product-image-phase4-c0-edit-probe.zip
+
+      - name: Upload C0 Work test Skill ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: md3-product-image-phase4-c0-edit-probe
+          path: md3-product-image-phase4-c0-edit-probe.zip
+          if-no-files-found: error
+          retention-days: 30
