@@ -1,0 +1,4 @@
+interface:
+  display_name: "MD3 Product Image — Phase 4 C0"
+  short_description: "验证 Work 是否真正执行既有背景图编辑"
+  default_prompt: "使用 $md3-product-image 对已锁定母版执行 Phase 4 C0 橙色 palette-only 编辑探针；必须使用明确的 edit 操作，若不可用则停止"
