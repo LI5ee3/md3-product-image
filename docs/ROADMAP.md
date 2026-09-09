@@ -20,11 +20,11 @@ The upgrade is an evolution of the current workflow, not a rewrite.
 | Phase 1 — Production raster contract | **COMPLETED** | Logical 1536×2048 layout retained; locked MASTER actual raster becomes SKU hard contract |
 | Phase 2 — Structured prompt | **COMPLETED** | Structured prompt promoted; v2.0 prompt retained as baseline/fallback |
 | Phase 3 — Deterministic palette reference | **COMPLETED** | Palette-only reference promoted to default after MASTER + orange/white SKU Work A/B |
-| Phase 4 — Constrained SKU image edit | **COMPLETED / NOT ADOPTED** | Real Work C0 exposed no verifiable edit operation; Phase 3 SKU regeneration remains authoritative |
-| Phase 5 — Optional layout guide | **PLANNED / P2** | Run only if safe-zone evidence justifies it |
-| Phase 6 — Model / quality policy | **NEXT** | Enumerate only controls actually exposed by the production Work/Skill runtime before any ablation |
-| Phase 7 — Consolidated regression suite | **PLANNED** | Merge deterministic and visual ablation evidence |
-| Phase 8 — Public contract / README / release | **PLANNED** | Only after accepted behavior is stable |
+| Phase 4 — Constrained SKU image edit | **COMPLETED / NOT ADOPTED** | Work exposes no verifiable edit operation; Phase 3 SKU regeneration remains authoritative |
+| Phase 5 — Optional layout guide | **SKIPPED / NOT NEEDED** | Accepted Work results kept the numeric safe zone clean; no guide ablation is justified |
+| Phase 6 — Runtime/model/quality policy | **COMPLETED** | Runtime schema enumerated; explicit reference-path mode adopted; model/quality controls are not exposed |
+| Phase 7 — Consolidated regression suite | **NEXT** | Merge deterministic and visual evidence and run final production smoke tests |
+| Phase 8 — Public contract / README / release | **PLANNED** | Only after Phase 7 passes |
 
 ---
 
@@ -51,88 +51,45 @@ The upgrade is an evolution of the current workflow, not a rewrite.
 
 ---
 
-# Phase 0 — Establish an Images 2.5 baseline
+# Phase 0 — Baseline and runtime verification
 
-**Status: COMPLETED**  
-**Priority: P0**
+**Status: COMPLETED**
 
-## Completed evidence
+Authority set:
 
-- Existing deterministic workflow self-check: PASS.
-- Real production Work run established with:
-  - `黑.png` as MASTER source,
-  - `橙.png` as SKU A,
-  - `白.png` as SKU B,
-  - `HUAWEI-LOGO.png`,
-  - fixed two-line product title and Russian version text.
-- v2.0 MASTER and two SKU outputs were visually reviewed and accepted as the baseline.
-- Real delivered files were inspected directly instead of trusting UI-reported logical dimensions.
-- Background-mode control was verified in the callable image runtime.
-- The project-conversation image surface was proven not equivalent to the production Skill transport contract for exact prompt/reference/edit testing.
-- Project-chat edit probes did not enter verified image-edit semantics; Phase 4 therefore remained gated on a real Work test.
+- `黑.png` MASTER source
+- `橙.png` SKU A
+- `白.png` SKU B
+- `HUAWEI-LOGO.png`
+- fixed two-line HUAWEI WATCH FIT 5 Pro title and Russian version text
 
-## Important finding
-
-Work reported `1536 × 2048`, while downloaded production outputs were consistently observed at:
-
-```text
-1086 × 1448
-```
-
-Both are exact 3:4, but they are different pixel resolutions. This finding changed Phase 1.
+Key finding: Work reported `1536 × 2048`, while downloaded production outputs were consistently `1086 × 1448`. Both are exact 3:4. This finding changed Phase 1.
 
 ---
 
 # Phase 1 — Production raster contract
 
-**Status: COMPLETED**  
-**Priority: P0**
+**Status: COMPLETED**
 
-The original plan assumed `1536 × 2048` should become the mandatory delivered raster. Real Work evidence disproved that assumption.
+`1536 × 2048` remains the logical layout coordinate system only.
 
-## Implemented contract
+A MASTER may use any exact 3:4 raster accepted by the workflow. When the user locks it, the actual width/height are persisted in `master.json`.
 
-### Logical layout canvas
-
-Keep `1536 × 2048` as the canonical deterministic layout coordinate system produced by `measure_text.py`.
-
-It defines normalized placement and safe-zone geometry. It is not a promise about the Image Gen delivery raster.
-
-### MASTER delivery raster
-
-A MASTER background may use any exact 3:4 raster accepted by the workflow. The local composite is created at the actual generated-background raster. Do not automatically upscale a valid MASTER background merely to force the logical layout size.
-
-When the user locks the MASTER, its actual width/height are recorded in `master.json`.
-
-### SKU delivery raster
-
-Every SKU background must match the locked MASTER's actual pixel width and height exactly. A background that is still 3:4 but has different dimensions fails deterministically with:
+Every SKU background must match the locked MASTER raster exactly. Same-ratio/different-size backgrounds fail deterministically with:
 
 ```text
 SKU_BACKGROUND_RASTER_MISMATCH
 ```
 
-No automatic image-generation retry is allowed.
-
-### Legacy compatibility
-
-For an older bound `master.json` without a persisted raster field, derive the raster from the hash-verified `ORIGINAL_MASTER_BACKGROUND.png`. Never guess another size.
-
-## Acceptance
-
-- production raster integration self-check: PASS
-- existing deterministic workflow self-check: PASS
+Legacy bound masters without a raster field derive it from the hash-verified `ORIGINAL_MASTER_BACKGROUND.png`; the workflow never guesses another size.
 
 ---
 
-# Phase 2 — Structured master prompt
+# Phase 2 — Structured prompt
 
-**Status: COMPLETED / PROMOTED**  
-**Priority: P0**
+**Status: COMPLETED / PROMOTED**
 
-The prose-heavy v2.0 prompt was replaced with the validated structured background artifact specification.
-
-## Default prompt structure
+The active prompt uses ordered sections:
 
 1. `DELIVERABLE`
 2. `REFERENCE ROLES`
@@ -143,240 +100,128 @@ The prose-heavy v2.0 prompt was replaced with the validated structured backgroun
 7. `EXCLUSIONS`
 8. `OUTPUT CONTRACT`
 
-The deterministic `FINAL_INFORMATION_SAFE_ZONE`, accumulated user additions, and canonical product/shadow placement policy continue to be appended by `scene_prompt.py`.
-
-## A/B result
-
-Using the same HUAWEI source set in real Work:
+Real Work A/B:
 
 - structured black MASTER: PASS
 - structured orange SKU: PASS
 - structured white SKU: PASS
 
-The structured version was preferred over v2.0 for quieter reusable background composition, safe-zone cleanliness, cleaner palette migration, and SKU composition consistency.
-
-## Decision
-
-`references/image-gen-prompt.txt` remains the active structured prompt. The v2.0 prompt is preserved at:
-
-```text
-references/image-gen-prompt-v2-baseline.txt
-```
-
-for regression, ablation, and fallback comparison only.
-
-Detailed evidence is in `docs/phase-2/`.
+The structured prompt is the default. The v2.0 prose prompt remains at `references/image-gen-prompt-v2-baseline.txt` for regression/ablation/fallback only.
 
 ---
 
 # Phase 3 — Deterministic palette reference
 
-**Status: COMPLETED / PROMOTED**  
-**Priority: P1**
+**Status: COMPLETED / PROMOTED**
 
-## Question resolved
+Image Gen no longer receives complete product artwork merely to learn colors.
 
-When Image Gen only needs product colors, the complete product artwork no longer needs to be exposed as a semantic reference.
-
-The accepted production path now uses a deterministic color-only reference.
-
-## Implemented extraction
+Production uses deterministic local palette extraction via:
 
 ```text
 scripts/extract_palette.py
-```
-
-Current deterministic policy:
-
-- ignore pixels below alpha threshold 32,
-- nearest-neighbor source sampling with max edge 512,
-- 5-bit/channel RGB histogram,
-- fixed maximum of 7 representative colors,
-- 4 coverage-oriented dominant slots,
-- remaining slots reserve saturation-aware accent colors,
-- after selecting representatives, assign every visible histogram bin to its nearest representative,
-- use full visible-pixel coverage for color-band widths,
-- generate a 1024 × 256 RGB `palette-reference.png` containing color bands only.
-
-No model is used for palette extraction.
-
-## Deterministic cache
-
-```text
 scripts/palette_cache.py
 ```
 
-MASTER assets:
-
-```text
-reusable/palette.json
-reusable/palette-reference.png
-```
-
-SKU assets are keyed by authoritative source SHA-256 under:
-
-```text
-reusable/palettes/
-```
-
-Existing cache entries are identity-checked and deterministic-output-checked before reuse. Tampering or source mismatch fails before Image Gen.
-
-## Real Work A/B
-
-### A — Phase 2 baseline
-
-Structured prompt + complete product image as palette reference.
-
-### B — accepted Phase 3 path
-
-Structured prompt + deterministic palette-only reference; complete product artwork remains local only.
-
-Results:
-
-- palette-only black MASTER: PASS
-- palette-only orange SKU: PASS
-- palette-only white SKU: PASS
-- palette harmony: no material regression
-- background quality: no material regression
-- safe-zone behavior: stable
-- SKU composition consistency: stable/high
-- semantic product-reference exposure: reduced by design
-
-The black palette-only MASTER was somewhat darker/heavier than the Phase 2 A result, but the trade-off was judged non-material.
-
-## Production reference contract
-
-MASTER Image Gen receives exactly:
+MASTER Image Gen reference:
 
 ```text
 palette-reference.png
 ```
 
-SKU Image Gen receives exactly:
+SKU Image Gen references:
 
 ```text
-ORIGINAL_MASTER_BACKGROUND.png     composition reference
-SKU palette-reference.png         color-only reference
+ORIGINAL_MASTER_BACKGROUND.png
+current-SKU-palette-reference.png
 ```
 
-The authoritative product/SKU image is used only by deterministic local composition and is not sent to Image Gen for palette transfer.
+The complete product/SKU artwork remains local for deterministic composition.
 
-## Acceptance
-
-- real Work MASTER + two-SKU A/B: PASS
-- deterministic palette extraction: PASS
-- deterministic palette cache: PASS
-- structured prompt contract: PASS
-- existing deterministic workflow regression: PASS
-
-Detailed protocol and results are in `docs/phase-3/PLAN.md` and `docs/phase-3/RESULTS.md`.
+Real Work palette-only MASTER + orange SKU + white SKU all passed with no material regression in palette harmony, background quality, safe-zone behavior, or SKU composition consistency.
 
 ---
 
-# Phase 4 — Constrained SKU background editing
+# Phase 4 — Constrained SKU edit
 
-**Status: COMPLETED / NOT ADOPTED**  
-**Priority: P0**
+**Status: COMPLETED / NOT ADOPTED**
 
-The intended goal was to edit the locked `ORIGINAL_MASTER_BACKGROUND.png` itself and allow only palette changes, rather than regenerate an SKU background while using the master as a composition reference.
-
-## Runtime gate result
-
-A dedicated C0 probe was executed in the real Work + Skill runtime.
-
-The runtime returned:
+A dedicated Work C0 probe returned:
 
 ```text
 IMAGE_EDIT_INTERFACE_UNAVAILABLE
 ```
 
-Observed behavior:
+The callable surface exposed normal generation but no explicit existing-image edit operation or equivalent verifiable edit selector. The probe failed closed before any image-model call.
 
-- ordinary Image Gen generation was exposed,
-- no explicit existing-image edit operation or equivalent verifiable edit selector was exposed,
-- the Skill could not prove that the master background would be edited instead of being used as a reference for a new generation.
+C1/C2 edit ablations were not run because they would not be valid without proven edit semantics.
 
-The probe correctly failed closed before any image-model call.
+Production therefore retains the Phase 3 SKU regeneration path.
 
-It did not modify the locked MASTER, create a candidate edited background, create a new production SKU, or replace an existing SKU.
+---
 
-## C1 / C2
+# Phase 5 — Optional layout guide
 
-Orange and white edit ablations were not executed because C0 failed the interface-proof gate.
+**Status: SKIPPED / NOT NEEDED**
 
-Running them without verified edit semantics would conflate ordinary regeneration with editing and would not provide valid evidence.
+The conditional gate for `layout-guide.png` was not met. Accepted Phase 2 and Phase 3 MASTER/SKU Work results kept the information safe zone clean without an auxiliary layout image.
 
-## Decision
+Adding another model reference would increase complexity without evidence of a current failure. Reopen Phase 5 only if a future production regression shows numeric safe-zone instructions are insufficient.
+
+---
+
+# Phase 6 — Runtime/model/quality policy
+
+**Status: COMPLETED**
+
+A fresh isolated Work C0 probe enumerated the actual Image Gen callable surface.
+
+Directly settable:
 
 ```text
-Adopt constrained SKU edit: NO
-Retain Phase 3 regeneration path: YES
+prompt
+num_last_images_to_include
+referenced_image_paths
 ```
 
-The production SKU path therefore remains:
+Not directly exposed:
+
+- model selection
+- quality / effort
+- output size / resolution
+- background / transparency
+- output format
+- image action / mode
+
+Therefore no model/quality/size/background/output-format A/B is valid on the current Work Skill surface.
+
+C1 proved `num_last_images_to_include` and `referenced_image_paths` are mutually exclusive.
+
+C2 proved the accepted production callable mode:
 
 ```text
-ORIGINAL_MASTER_BACKGROUND.png     composition reference
-SKU palette-reference.png         color-only reference
-        ↓
-Image Gen background regeneration
-        ↓
-deterministic local composition
-        ↓
-final SKU
+prompt = exact deterministic scene prompt
+referenced_image_paths = exact explicit authority list
+num_last_images_to_include = OMITTED
 ```
 
-This is a runtime-surface limitation, not a claim that Images 2.5 lacks image-edit capability generally.
+C2 returned an accessible `1086 × 1448` RGBA background with SHA-256:
 
-Phase 4 may be reopened only if the Work/Skill runtime later exposes an explicit edit operation or equivalent directly verifiable edit semantics.
+```text
+d9f5b6fa0389b4a3475352c79509a09ac35e80e725fe5caba7344f697e4a99b9
+```
 
-Detailed evidence is in `docs/phase-4/PLAN.md` and `docs/phase-4/RESULTS.md`.
-
----
-
-# Phase 5 — Optional layout-control reference
-
-**Status: PLANNED / P2**
-
-Test `layout-guide.png` only if later evidence shows numeric safe-zone instructions remain insufficient.
-
-Rules:
-
-- guidance only, never pixel-accurate guarantee,
-- never weaken deterministic local placement,
-- do not introduce masks unless actual runtime behavior is verified,
-- keep only if safe-zone consistency materially improves without guide artifacts or excessive rigidity.
+The production `SKILL.md` now requires explicit `referenced_image_paths`, omits `num_last_images_to_include`, and forbids inferring unsupported public-API controls.
 
 ---
 
-# Phase 6 — Model and quality policy
+# Phase 7 — Consolidated regression suite
 
-**Status: NEXT**  
-**Priority: P1**
-
-Public Images 2.5 API capabilities and the actual Skill runtime are not assumed to be identical.
-
-Before changing defaults:
-
-- enumerate controls actually exposed to the production runtime,
-- test master and SKU separately,
-- compare only settings the runtime can really invoke,
-- evaluate instruction following, MD3 quality, palette relevance, safe-zone adherence, object contamination, composition drift, failure rate, and latency where observable.
-
-Use the fastest/lowest-cost option that consistently meets the acceptance criteria. Do not assume the highest quality setting is automatically best.
-
-The first Phase 6 gate is capability enumeration only. No model name, quality level, size, output format, or background mode may be written into the production Skill contract until that control is proven callable in the real Work/Skill runtime.
-
----
-
-# Phase 7 — Consolidated regression and ablation suite
-
-**Status: PLANNED**  
-**Priority: P1**
+**Status: NEXT**
 
 ## Deterministic coverage
 
-Maintain tests for:
+Consolidate tests for:
 
 - product-directory identity
 - source hashes
@@ -394,10 +239,12 @@ Maintain tests for:
 - SKU redo atomic replacement
 - failed redo preserving old final
 - reusable asset identity
+- explicit Image Gen reference-path contract
+- unsupported runtime-control exclusions
 
-## Visual matrix
+## Visual evidence matrix
 
-Maintain explicitly scored Work results for:
+Preserve scored Work evidence for:
 
 - background quality
 - Classic MD3 adherence
@@ -407,41 +254,35 @@ Maintain explicitly scored Work results for:
 - SKU composition drift
 - accidental generated text / Logo / objects
 
-## Required ablations
+## Required ablations status
 
 1. v2.0 prompt vs structured prompt — **DONE**
 2. full product reference vs deterministic palette-only reference — **DONE**
-3. SKU regeneration vs constrained edit — **DONE / NOT ADOPTED: runtime edit interface unavailable**
-4. numeric safe zone vs numeric + optional layout guide — optional
-5. model/quality configurations actually exposed by runtime — **NEXT**
+3. SKU regeneration vs constrained edit — **DONE / NOT ADOPTED**
+4. numeric safe zone vs optional layout guide — **SKIPPED / NOT NEEDED**
+5. model/quality configurations — **DONE / NOT APPLICABLE: controls not exposed**
+
+Phase 7 should end with a production-like MASTER → lock → orange SKU → white SKU smoke run using the final accepted Skill package.
 
 ---
 
 # Phase 8 — Public Skill contract, README, and release
 
-**Status: PLANNED**  
-**Priority: P1**
+**Status: PLANNED**
 
 Only accepted, tested behavior is documented as production behavior.
 
-Expected final files may include:
+Expected final work:
 
-- `SKILL.md`
-- `README.md`
-- `references/image-gen-prompt.txt`
-- `references/replace-variant-block.md`
-- `scripts/scene_prompt.py`
-- raster-contract helpers/tests
-- `scripts/extract_palette.py`
-- `scripts/palette_cache.py`
-- palette tests
-- optional layout-guide code only if accepted
-
-No release is cut from an unresolved major ablation state.
+- reconcile `SKILL.md` and `README.md`
+- remove test-only packaging from release artifacts
+- keep accepted production scripts and references only
+- run final package validation
+- cut the next release only after Phase 7 passes
 
 ---
 
-# Invariants that must survive every phase
+# Invariants
 
 1. One exact complete product name maps to one product directory.
 2. Reusable assets are identity-checked and never silently replaced.
@@ -458,10 +299,11 @@ No release is cut from an unresolved major ablation state.
 13. Deterministic failures do not trigger an automatic image-generation retry.
 14. SKU redo preserves the old final until the replacement passes deterministic checks.
 15. Final replacement remains atomic.
-16. The logical layout canvas and the actual delivery raster are distinct concepts.
-17. After MASTER lock, all SKU outputs must match the MASTER actual raster exactly.
-18. Image Gen receives color-only palette references by default; authoritative product artwork remains local.
+16. The logical layout canvas and actual delivery raster are distinct concepts.
+17. After MASTER lock, all SKU outputs match the MASTER actual raster exactly.
+18. Image Gen receives palette-only references by default; authoritative product artwork remains local.
 19. Unsupported runtime controls are never inferred from public API capability alone.
+20. Image Gen calls use explicit `referenced_image_paths`; `num_last_images_to_include` is omitted because the selectors are mutually exclusive on the validated Work runtime.
 
 ---
 
@@ -478,11 +320,11 @@ Phase 3  Deterministic palette reference                DONE
    ↓
 Phase 4  Constrained SKU edit path                      DONE / NOT ADOPTED
    ↓
-Phase 6  Model / quality runtime capability gate        NEXT
+Phase 6  Runtime capability / reference-path contract   DONE
    ↓
-Phase 5  Optional layout-guide ablation
+Phase 5  Optional layout-guide ablation                 SKIPPED / NOT NEEDED
    ↓
-Phase 7  Consolidated regression suite
+Phase 7  Consolidated regression suite                  NEXT
    ↓
 Phase 8  Final Skill / README / release
 ```
@@ -491,15 +333,17 @@ Phase 8  Final Skill / README / release
 
 # Definition of done
 
-The Images 2.5 upgrade is complete only when all of the following are true:
+The Images 2.5 upgrade is complete only when:
 
-- the structured palette-only master prompt remains the validated default,
+- the structured palette-only prompt remains the validated default,
 - logical layout and actual delivery raster semantics are correct and documented,
 - locked MASTER raster is enforced across SKUs,
 - palette-only reference is used through the deterministic cache contract,
-- SKU edit is either validated and adopted or explicitly rejected with the existing regeneration fallback retained,
+- the Phase 3 SKU regeneration fallback remains authoritative while edit semantics are unavailable,
+- explicit `referenced_image_paths` is the validated callable reference contract,
+- unsupported Work runtime controls are not invented from API documentation,
 - no deterministic product/Logo/text/shadow responsibility moves into the image model,
 - prompt generation remains reproducible and recorded,
-- accepted ablations are documented,
-- deterministic regression tests pass,
+- consolidated regression tests pass,
+- a final production-like Work smoke run passes,
 - `SKILL.md` and `README.md` describe implemented behavior rather than planned behavior.
