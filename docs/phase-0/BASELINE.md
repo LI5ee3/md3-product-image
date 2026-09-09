@@ -1,28 +1,29 @@
 # Phase 0 Baseline
 
-Status: **IN PROGRESS**
+Status: **IN PROGRESS — VISUAL BASELINE BLOCKED BY HARNESS MISMATCH**
 
 Date: 2026-09-09
 
 This document freezes the current `md3-product-image` behavior before any Images 2.5 implementation change lands.
 
-The purpose of Phase 0 is to separate three things that must not be conflated:
+Phase 0 separates four things that must not be conflated:
 
-1. the current repository behavior,
-2. capabilities documented for GPT Image 2.5 in the OpenAI API,
-3. controls actually exposed by the image-generation runtime available to this Skill.
+1. frozen repository behavior,
+2. deterministic workflow correctness,
+3. GPT Image / ChatGPT Images capabilities,
+4. controls and transport actually exposed by the runtime used for a given test.
 
-No production behavior should change during Phase 0.
+No production behavior changes during Phase 0.
 
 ---
 
 ## 1. Frozen repository baseline
 
-The baseline starts from branch commit:
+Production behavior is compared against:
 
 `128d8b2f1197f1a17aed34a61c82ac5fc6284736`
 
-Relevant files at that baseline:
+Relevant frozen blobs:
 
 | File | Git blob SHA |
 | --- | --- |
@@ -32,234 +33,204 @@ Relevant files at that baseline:
 | `scripts/scene_prompt.py` | `dfec120454e3b3af9e313ab94959b6d65efa32fb` |
 | `scripts/test_workflow.py` | `567cf81f5f7c933e3f2b6a1d12b6c56220a07ba7` |
 
-These hashes are the authoritative Phase 0 comparison point. Later prompt or workflow changes must be evaluated against this exact baseline rather than against memory or a reconstructed prompt.
-
-### Current master behavior
-
-The baseline master path is:
+### MASTER path
 
 `MEASURE -> BUILD_PROMPT -> IMAGE_GEN_BACKGROUND -> LOCAL_FULL_COMPOSITE -> MASTER_USER_LOCK_OR_REDO`
 
-Image generation creates an empty background plate. Product artwork, product placement, fixed 2D shadow, Logo, title, version text, and final composition remain local and deterministic.
+### SKU path
 
-### Current SKU behavior
+The frozen SKU path generates a new empty background using:
 
-The baseline SKU path generates a new empty background using:
+- bound `ORIGINAL_MASTER_BACKGROUND.png` as composition reference,
+- current SKU product image as palette reference.
 
-- `ORIGINAL_MASTER_BACKGROUND.png` as composition reference,
-- the current SKU product image as palette reference.
-
-The prompt asks the model to keep composition unchanged and adapt only colors. This is reference-guided regeneration, not an explicit image-edit contract in repository code.
+It is reference-guided regeneration, not an explicit Images API edit endpoint in repository code.
 
 ---
 
-## 2. Existing deterministic self-check
+## 2. Deterministic workflow baseline
 
-`scripts/test_workflow.py` is retained as the deterministic workflow baseline.
+`scripts/test_workflow.py` was executed unchanged through GitHub Actions in the repository environment.
 
-It currently checks, among other things:
+Result:
 
-- PNG / WEBP source handling,
-- exact title-line preservation,
-- safe-zone prompt inclusion,
-- prompt recording,
-- one active user-decision gate,
-- cached master product and shadow reuse,
-- prompt-addition accumulation,
-- explicit master binding,
-- final master filename,
-- automatic SKU label assignment,
-- SKU redo without consuming a new label,
-- failed SKU redo preserving the existing final,
-- successful atomic replacement,
-- cached SKU product and shadow reuse,
-- absence of thumbnails.
+**PASS**
 
-The existing self-check uses one simple synthetic red master product and one blue SKU product. It remains useful for deterministic workflow regression, but it is not sufficient as the Images 2.5 visual evaluation set.
+Recorded evidence:
 
-### Execution note
+`docs/phase-0/DETERMINISTIC_BASELINE.md`
 
-A direct clone-and-run attempt from the current assistant container was blocked because that container cannot resolve `github.com`. This is an environment network limitation, not a repository test failure.
+The workflow self-check covers source handling, exact title preservation, safe-zone prompt inclusion, attempt state, master binding, sequential SKU naming, SKU redo behavior, atomic replacement, cached product/shadow reuse, and related deterministic invariants.
 
-The test source itself was read successfully through the connected GitHub interface. Phase 0 should not mark the deterministic self-check as freshly executed until it is run in a repository-capable runtime or CI environment.
+This remains the hard regression gate for later phases.
 
 ---
 
-## 3. Fixed visual evaluation inputs
+## 3. Authoritative visual input set
 
-Phase 0 introduces:
+The earlier synthetic fixtures remain available only for deterministic code/regression tests.
 
-`scripts/generate_phase0_fixtures.py`
+All visual evaluation from this point forward uses the project Google Drive folder documented in:
 
-It deterministically generates seven transparent PNG product references plus a common source Logo and a hash-bearing `manifest.json`.
+`docs/phase-0/AUTHORITY_INPUTS.md`
 
-The fixed coverage set is:
+Fixed visual sequence:
 
-1. `light-product`
-2. `dark-product`
-3. `saturated-product`
-4. `low-saturation-product`
-5. `wide-product`
-6. `tall-product`
-7. `multi-dominant-color`
+1. MASTER: `黑.png`
+2. SKU A: `橙.png`
+3. SKU B: `白.png`
+4. Logo: `HUAWEI-LOGO.png`
+5. copy: Drive file `信息`
 
-Each fixture uses the same 768 × 1024 source canvas and fixed pixels. The generated `manifest.json` records SHA-256 identities so later ablations can verify that identical source inputs were used.
-
-Generate the set with:
+Exact copy:
 
 ```text
-python scripts/generate_phase0_fixtures.py --output-dir <phase-0-fixture-directory>
+完整产品名称：HUAWEI WATCH FIT 5 Pro
+产品名称显示行数：两行
+产品名称第一行：HUAWEI
+产品名称第二行：WATCH FIT 5 Pro
+版本文字：Глобальная версия
 ```
 
-The generator was locally self-checked before being committed:
-
-- exactly seven fixtures were produced,
-- all seven required coverage categories were present,
-- every product fixture was 768 × 1024 RGBA,
-- the manifest parsed successfully.
-
-These synthetic inputs are intentionally simple. They isolate palette and geometry classes without introducing changing third-party product photography. Real-product spot checks may be added later, but they must not replace this fixed set for cross-phase comparisons.
+These source files, IDs, raster dimensions, and SHA-256 identities are frozen in `AUTHORITY_INPUTS.md`.
 
 ---
 
-## 4. Current prompt baseline
+## 4. Current MASTER prompt baseline
 
-The baseline master prompt is the exact contents of:
+The black MASTER prompt was assembled from the frozen repository behavior and archived at:
 
-`references/image-gen-prompt.txt`
+`docs/phase-0/huawei-watch-fit-5-pro/master-prompt-black.txt`
 
-at Git blob:
+Prompt SHA-256:
 
-`163dc1a43408b97b60653e1d35553dcaa2dac43f`
+`12148360c40fe556ee8304c68a3914aa69e380d9fd75863b29809eac6a01a773`
 
-The baseline SKU-specific block is the exact contents of:
+Current measured merged information safe zone:
 
-`references/replace-variant-block.md`
+```text
+FINAL_INFORMATION_SAFE_ZONE: x 0.0%-75.0%, y 0.0%-40.8%
+```
 
-at Git blob:
-
-`a9eab5f83ae9913e00c18e78c7e7ac1e3ff40908`
-
-Do not duplicate or rewrite those files for the baseline. The pinned blob identities are the record. This avoids creating two authoritative copies of the same prompt.
-
-For every visual baseline run, archive the complete prompt emitted by `scene_prompt.py`; that emitted prompt remains the authoritative per-attempt record because it also contains the measured safe zone and any accumulated user additions.
+The archived prompt, not a reconstructed summary, is the authoritative baseline prompt for this real-input case.
 
 ---
 
-## 5. GPT Image 2.5 capability verification
+## 5. GPT Image / runtime capability matrix
 
-The following matrix distinguishes OpenAI API support from the Skill runtime surface visible in this session.
-
-| Capability | OpenAI API documentation | Current Skill runtime surface | Phase 0 status |
+| Capability | API / product capability | Current project-conversation surface | Phase 0 status |
 | --- | --- | --- | --- |
-| GPT Image 2.5 Flare | Model exists | No model selector exposed | API VERIFIED / RUNTIME UNSELECTABLE |
-| GPT Image 2.5 Sunburst | Model exists | No model selector exposed | API VERIFIED / RUNTIME UNSELECTABLE |
-| Dated model snapshot | `gpt-image-2.5-*-2026-09-08` documented | No model selector exposed | API VERIFIED / RUNTIME UNAVAILABLE |
-| Image generation | Supported | Image-generation operation available | VERIFIED |
-| Explicit image edit endpoint | Sunburst documents `/v1/images/edits` | Editing existing conversation images is supported semantically, but no endpoint selector is exposed | API VERIFIED / RUNTIME PARTIAL |
-| Reference image input | Image input supported | Existing images in the conversation can be used for edits/references | VERIFIED AT HIGH LEVEL |
-| Quality control | `low`, `medium`, `high`, `xhigh`, `max`, `auto` documented for Flare and Sunburst | No quality parameter exposed | API VERIFIED / RUNTIME UNAVAILABLE |
-| Size control | GPT Image API supports size controls; exact 2.5 runtime behavior must be trialed | Runtime exposes a `size` string | PARAMETER EXPOSED / 1536×2048 NOT YET TRIALED |
-| Transparent background control | Model/API family supports background controls | Runtime exposes `transparent_background: bool` | PARAMETER EXPOSED |
-| Explicit `background=opaque` enum | Documented in the GPT Image 2.5 API rollout | Runtime does not expose an `opaque` enum; only the transparency boolean | API VERIFIED / RUNTIME NOT EXPOSED DIRECTLY |
-| Output format selector | Available in API-level image workflows | No output-format parameter exposed in the current Skill image tool | RUNTIME UNAVAILABLE |
-| Edit mask | API edit workflows may expose masks depending on interface | No mask parameter exposed in the current Skill image tool | RUNTIME UNAVAILABLE |
-| Explicit input-fidelity control | API-level feature may vary by image interface/model | No input-fidelity parameter exposed in the current Skill image tool | RUNTIME UNAVAILABLE |
+| GPT Image 2.5 Flare | documented | no model selector exposed | API VERIFIED / RUNTIME UNSELECTABLE |
+| GPT Image 2.5 Sunburst | documented | no model selector exposed | API VERIFIED / RUNTIME UNSELECTABLE |
+| Image generation | supported | callable | VERIFIED |
+| Explicit image edit endpoint | API supports editing; Sunburst is precision-oriented | project probe did not enter demonstrable edit mode | API VERIFIED / CURRENT HARNESS NOT VERIFIED |
+| Quality control | API documents quality tiers | not exposed here | API VERIFIED / RUNTIME UNAVAILABLE |
+| Custom size | API supports custom resolutions under documented constraints | exact raster control not successfully validated in this harness | API VERIFIED / CURRENT HARNESS UNVERIFIED |
+| Transparent background | supported | boolean control exposed and tested | VERIFIED |
+| Non-transparent background | supported | boolean false tested | VERIFIED |
+| Explicit `background=opaque` enum | API-level option | enum not exposed here | API VERIFIED / RUNTIME NOT EXPOSED DIRECTLY |
+| Output format selector | API-level option | not exposed here | RUNTIME UNAVAILABLE |
+| Edit mask | API edit capability depends on surface | not exposed here | RUNTIME UNAVAILABLE |
+| Verbatim prompt transport | repository requires exact stdout forwarding | current project conversation does not expose equivalent `functions.exec -> generatedImage` bridge | HARNESS MISMATCH |
 
-### Important consequence
+### Background-mode evidence
 
-The repository must not hard-code the following based only on API documentation:
+`docs/phase-0/BACKGROUND_MODE_VALIDATION.md`
 
-- `gpt-image-2.5-sunburst`,
-- `gpt-image-2.5-flare`,
-- a `quality` value,
-- a mask argument,
-- an explicit `background=opaque` argument,
-- a specific edit endpoint.
+Result:
 
-Those are safe to use only if the actual Skill execution interface exposes them.
+**PASS**
 
-The current runtime can still benefit from Images 2.5 behavior when the platform routes image operations to it, but the Skill cannot claim deterministic control over a parameter it cannot set.
+- transparency enabled -> RGBA PNG with real transparent pixels
+- transparency disabled -> RGB PNG with no alpha channel
 
----
+### Native-size evidence
 
-## 6. Official sources checked
+`docs/phase-0/NATIVE_SIZE_VALIDATION.md`
 
-OpenAI sources checked on 2026-09-09:
+The API-level legality of `1536x2048` is verified, but exact runtime raster delivery has not been validly demonstrated through the current project-conversation harness.
 
-- `https://openai.com/index/introducing-chatgpt-images-2-5/`
-- `https://developers.openai.com/api/docs/models/gpt-image-2.5-flare`
-- `https://developers.openai.com/api/docs/models/gpt-image-2.5-sunburst`
+### Image-edit evidence
 
-Verified from those sources:
+`docs/phase-0/IMAGE_EDIT_VALIDATION.md`
 
-- ChatGPT Images 2.5 launched on 2026-09-08.
-- API models are GPT Image 2.5 Flare and GPT Image 2.5 Sunburst.
-- Sunburst is the precision-oriented generation/editing model.
-- Flare is the faster default-oriented model.
-- Both model pages document `low`, `medium`, `high`, `xhigh`, `max`, and `auto` quality choices.
-- Sunburst explicitly lists the Image Edit endpoint.
-- dated 2026-09-08 model snapshots are documented.
+The current project probe did not demonstrate true edit-mode entry, so Phase 4 cannot be treated as runtime-verified yet.
 
 ---
 
-## 7. Visual baseline run protocol
+## 6. Prompt-delivery harness finding
 
-Each of the seven fixtures must receive one baseline master run using the frozen repository behavior.
+See:
 
-For each fixture:
+`docs/phase-0/PROMPT_DELIVERY_VALIDATION.md`
 
-1. generate the fixture set and verify its manifest SHA-256 values,
-2. run the existing `measure_text.py` path,
-3. build the master prompt with the frozen prompt implementation,
-4. perform exactly one image-model operation,
-5. create exactly one full local composite,
-6. do not auto-retry based on aesthetics,
-7. record the generated-background identity and final-composite identity,
-8. record the actual resolved image dimensions if observable,
-9. score the output using `docs/phase-0/evaluation-results.csv`.
+The frozen `SKILL.md` requires:
 
-After a representative master is explicitly bound, create at least one baseline SKU for that fixture using the existing reference-guided regeneration path and record the same information.
+1. `scene_prompt.py build` stdout,
+2. captured successfully,
+3. forwarded verbatim to Image Gen,
+4. through its documented `functions.exec` / `generatedImage(result)` flow.
 
-Do not introduce the structured prompt, palette-only reference, constrained edit path, layout guide, or new quality policy during these baseline runs.
+The image surface callable in the current project conversation is not equivalent to that transport contract. It derives generation intent from conversation context rather than exposing the same explicit stdout-forwarding bridge.
 
----
+A real-input black MASTER probe therefore generated a complete product advertisement containing product, Logo, copy, and pedestal instead of the required empty background.
 
-## 8. Scoring contract
+That probe is **INVALID AS A PRODUCTION BASELINE SAMPLE**.
 
-Use integer scores from 1 to 5 for subjective metrics:
+It does not prove that the frozen prompt fails under the intended Skill runtime.
 
-- `background_quality`
-- `classic_md3_adherence`
-- `palette_harmony`
-- `safe_zone_cleanliness`
-- `sku_composition_consistency`
+Classification:
 
-Use binary `0/1` fields for undesirable events:
+- prompt source: **VERIFIED**
+- prompt deterministic assembly/hash: **VERIFIED**
+- verbatim delivery through current project harness: **NOT EQUIVALENT**
+- current-project visual MASTER sample: **INVALID**
 
-- `unwanted_product_copying`
-- `product_like_geometry`
-- `accidental_text_or_logo`
-- `unexpected_physical_environment`
-
-Do not average away failures. Keep the raw per-fixture records available for every later ablation.
+Do not rewrite the production prompt during Phase 0 merely to compensate for this harness mismatch.
 
 ---
 
-## 9. Phase 0 completion checklist
+## 7. Evaluation table
 
-- [x] Pin the repository baseline by commit and relevant blob identities.
-- [x] Document the existing deterministic workflow test coverage.
-- [x] Define a fixed seven-category visual evaluation set.
-- [x] Add a deterministic generator for that evaluation set.
-- [x] Self-check the fixture generator.
-- [x] Verify GPT Image 2.5 model names and API-level quality/edit capabilities from current OpenAI documentation.
-- [x] Record which controls are and are not exposed by the current Skill image runtime.
-- [ ] Freshly execute `scripts/test_workflow.py` in a repository-capable runtime or CI.
-- [ ] Trial an actual runtime image operation at exact `1536x2048` and record the resolved dimensions.
-- [ ] Trial runtime opaque/non-transparent output behavior and record the resolved result.
-- [ ] Produce and archive baseline master outputs for the fixed evaluation set.
-- [ ] Produce and archive representative baseline SKU outputs using the current reference-guided regeneration path.
-- [ ] Fill the Phase 0 evaluation-results table.
+`docs/phase-0/evaluation-results.csv` now contains the three authoritative HUAWEI cases only:
 
-Phase 0 is not complete until every unchecked item above has evidence recorded.
+- black MASTER
+- orange SKU
+- white SKU
+
+The black row records the frozen prompt SHA and notes the invalid real-input probe.
+
+Generated-background hashes, final-composite hashes, and visual scores remain empty until a valid prompt-delivery runtime produces a faithful sample.
+
+---
+
+## 8. Phase 0 completion checklist
+
+- [x] Pin repository baseline commit and relevant blob identities.
+- [x] Freshly execute `scripts/test_workflow.py` in repository CI.
+- [x] Verify deterministic workflow baseline passes.
+- [x] Verify current OpenAI Images 2.5 model/API capabilities needed for planning.
+- [x] Verify transparent and non-transparent background behavior in the callable surface.
+- [x] Attempt custom-size validation and correct the record to **runtime unverified** rather than false FAIL.
+- [x] Attempt image-edit/reference behavior and record current-harness limitation.
+- [x] Replace synthetic visual acceptance set with authoritative Google Drive HUAWEI assets and copy.
+- [x] Freeze the real black MASTER prompt and input hashes.
+- [x] Test the current project-conversation prompt-delivery path.
+- [x] Record the project-harness mismatch without changing production behavior.
+- [ ] Produce a valid black MASTER background through a runtime that can demonstrate exact repository prompt delivery.
+- [ ] Locally composite and inspect the black MASTER candidate.
+- [ ] Explicitly lock a representative MASTER for the baseline.
+- [ ] Produce orange and white baseline SKU outputs with the frozen reference-guided workflow.
+- [ ] Fill all required visual scores and output hashes.
+
+Phase 0 is not complete until the remaining visual baseline items have valid evidence.
+
+---
+
+## 9. Next valid action
+
+Do **not** spend additional project-conversation image calls trying to tune around the harness mismatch.
+
+The next valid Phase 0 action is to execute the frozen Skill through its actual intended runtime, or create a clearly separated API test harness that passes the exact archived prompt and reference image explicitly.
+
+Only then can the black MASTER visual baseline be accepted.
