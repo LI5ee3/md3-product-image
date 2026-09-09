@@ -1,4 +1,4 @@
 interface:
   display_name: "MD3 Product Image — Phase 6 C0"
   short_description: "枚举 Work 实际暴露的 Image Gen 运行时控制"
-  default_prompt: "使用 $md3-product-image 执行 Phase 6 C0 运行时控制探针；只读取当前 Work 实际暴露的 Image Gen 调用接口，禁止执行任何图像模型调用"
+  default_prompt: "使用 $md3-product-image-phase6-c0 执行 Phase 6 C0 运行时控制探针；只读取当前 Work 实际暴露的 Image Gen 调用接口，禁止执行任何图像模型调用"
