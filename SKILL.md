@@ -130,6 +130,10 @@ For an SKU, send exactly two Image Gen references:
 
 Do not send the current SKU product artwork to Image Gen. It remains local and authoritative for deterministic product composition.
 
+At the callable boundary, always use `referenced_image_paths` with only the exact reference files defined above. Omit `num_last_images_to_include` entirely; do not pass `0`, `null`, or another value together with explicit paths. The tested Work Image Gen interface treats `referenced_image_paths` and `num_last_images_to_include` as mutually exclusive.
+
+Do not set or infer Image Gen parameters for model selection, quality/effort, output size/resolution, background/transparency, output format, or action/mode. Those controls are not directly exposed by the validated Work + Skill callable interface. Public API capabilities are not production authority for this Skill.
+
 Image Gen creates only the empty background; never send Logo, text, masks, final composites, or another SKU.
 
 When calling Image Gen through `functions.exec`, forward its return value with `generatedImage(result)`. If no accessible raster is delivered, run `record-delivery-failure`, report it, and stop.
