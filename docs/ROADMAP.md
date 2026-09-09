@@ -20,9 +20,9 @@ The upgrade is an evolution of the current workflow, not a rewrite.
 | Phase 1 — Production raster contract | **COMPLETED** | Logical 1536×2048 layout retained; locked MASTER actual raster becomes SKU hard contract |
 | Phase 2 — Structured prompt | **COMPLETED** | Structured prompt promoted; v2.0 prompt retained as baseline/fallback |
 | Phase 3 — Deterministic palette reference | **COMPLETED** | Palette-only reference promoted to default after MASTER + orange/white SKU Work A/B |
-| Phase 4 — Constrained SKU image edit | **NEXT / RUNTIME-GATED** | Verify real Work edit semantics before changing the production SKU path |
+| Phase 4 — Constrained SKU image edit | **COMPLETED / NOT ADOPTED** | Real Work C0 exposed no verifiable edit operation; Phase 3 SKU regeneration remains authoritative |
 | Phase 5 — Optional layout guide | **PLANNED / P2** | Run only if safe-zone evidence justifies it |
-| Phase 6 — Model / quality policy | **PLANNED** | Runtime controls must be verified before hard-coding |
+| Phase 6 — Model / quality policy | **NEXT** | Enumerate only controls actually exposed by the production Work/Skill runtime before any ablation |
 | Phase 7 — Consolidated regression suite | **PLANNED** | Merge deterministic and visual ablation evidence |
 | Phase 8 — Public contract / README / release | **PLANNED** | Only after accepted behavior is stable |
 
@@ -69,7 +69,7 @@ The upgrade is an evolution of the current workflow, not a rewrite.
 - Real delivered files were inspected directly instead of trusting UI-reported logical dimensions.
 - Background-mode control was verified in the callable image runtime.
 - The project-conversation image surface was proven not equivalent to the production Skill transport contract for exact prompt/reference/edit testing.
-- Project-chat edit probes did not enter verified image-edit semantics; Phase 4 therefore remains gated on a real Work test.
+- Project-chat edit probes did not enter verified image-edit semantics; Phase 4 therefore remained gated on a real Work test.
 
 ## Important finding
 
@@ -275,58 +275,62 @@ Detailed protocol and results are in `docs/phase-3/PLAN.md` and `docs/phase-3/RE
 
 # Phase 4 — Constrained SKU background editing
 
-**Status: NEXT / RUNTIME-GATED**  
+**Status: COMPLETED / NOT ADOPTED**  
 **Priority: P0**
 
-Intended goal: instead of regenerating an SKU background while using the locked master as a composition reference, edit the locked `ORIGINAL_MASTER_BACKGROUND.png` itself and allow only palette changes.
+The intended goal was to edit the locked `ORIGINAL_MASTER_BACKGROUND.png` itself and allow only palette changes, rather than regenerate an SKU background while using the master as a composition reference.
 
-## Intended edit contract
+## Runtime gate result
 
-### Authoritative editable source
+A dedicated C0 probe was executed in the real Work + Skill runtime.
+
+The runtime returned:
 
 ```text
-ORIGINAL_MASTER_BACKGROUND.png
+IMAGE_EDIT_INTERFACE_UNAVAILABLE
 ```
 
-### Allowed change
+Observed behavior:
 
-- background palette / color relationships required to harmonize with the current SKU palette reference
+- ordinary Image Gen generation was exposed,
+- no explicit existing-image edit operation or equivalent verifiable edit selector was exposed,
+- the Skill could not prove that the master background would be edited instead of being used as a reference for a new generation.
 
-### Must preserve
+The probe correctly failed closed before any image-model call.
 
-- composition
-- geometry
-- panel/card placement
-- shape count
-- relative size
-- negative space
-- information safe zone
-- lighting direction
-- elevation hierarchy
-- visual density
+It did not modify the locked MASTER, create a candidate edited background, create a new production SKU, or replace an existing SKU.
 
-### Must never copy/infer from the SKU palette reference
+## C1 / C2
 
-- product geometry
-- labels
-- icons
-- text
-- Logo
-- product silhouette
-- packaging / object semantics
+Orange and white edit ablations were not executed because C0 failed the interface-proof gate.
 
-## Runtime gate
+Running them without verified edit semantics would conflate ordinary regeneration with editing and would not provide valid evidence.
 
-Project-conversation probes did not verify real edit semantics. Therefore the current production SKU regeneration path remains authoritative until a real Work/Skill test proves otherwise.
+## Decision
 
-Phase 4 must:
+```text
+Adopt constrained SKU edit: NO
+Retain Phase 3 regeneration path: YES
+```
 
-1. verify whether the real Work Skill surface actually performs an edit operation on the provided master background,
-2. compare the edit result against the current Phase 3 regeneration path,
-3. measure composition drift across at least orange and white variants,
-4. retain the existing regeneration path if edit semantics cannot be demonstrated or do not materially improve consistency.
+The production SKU path therefore remains:
 
-Do not infer unsupported edit parameters from public API documentation alone.
+```text
+ORIGINAL_MASTER_BACKGROUND.png     composition reference
+SKU palette-reference.png         color-only reference
+        ↓
+Image Gen background regeneration
+        ↓
+deterministic local composition
+        ↓
+final SKU
+```
+
+This is a runtime-surface limitation, not a claim that Images 2.5 lacks image-edit capability generally.
+
+Phase 4 may be reopened only if the Work/Skill runtime later exposes an explicit edit operation or equivalent directly verifiable edit semantics.
+
+Detailed evidence is in `docs/phase-4/PLAN.md` and `docs/phase-4/RESULTS.md`.
 
 ---
 
@@ -347,7 +351,7 @@ Rules:
 
 # Phase 6 — Model and quality policy
 
-**Status: PLANNED**  
+**Status: NEXT**  
 **Priority: P1**
 
 Public Images 2.5 API capabilities and the actual Skill runtime are not assumed to be identical.
@@ -360,6 +364,8 @@ Before changing defaults:
 - evaluate instruction following, MD3 quality, palette relevance, safe-zone adherence, object contamination, composition drift, failure rate, and latency where observable.
 
 Use the fastest/lowest-cost option that consistently meets the acceptance criteria. Do not assume the highest quality setting is automatically best.
+
+The first Phase 6 gate is capability enumeration only. No model name, quality level, size, output format, or background mode may be written into the production Skill contract until that control is proven callable in the real Work/Skill runtime.
 
 ---
 
@@ -405,9 +411,9 @@ Maintain explicitly scored Work results for:
 
 1. v2.0 prompt vs structured prompt — **DONE**
 2. full product reference vs deterministic palette-only reference — **DONE**
-3. SKU regeneration vs constrained edit — **NEXT / RUNTIME-GATED**
+3. SKU regeneration vs constrained edit — **DONE / NOT ADOPTED: runtime edit interface unavailable**
 4. numeric safe zone vs numeric + optional layout guide — optional
-5. model/quality configurations actually exposed by runtime — planned
+5. model/quality configurations actually exposed by runtime — **NEXT**
 
 ---
 
@@ -455,6 +461,7 @@ No release is cut from an unresolved major ablation state.
 16. The logical layout canvas and the actual delivery raster are distinct concepts.
 17. After MASTER lock, all SKU outputs must match the MASTER actual raster exactly.
 18. Image Gen receives color-only palette references by default; authoritative product artwork remains local.
+19. Unsupported runtime controls are never inferred from public API capability alone.
 
 ---
 
@@ -469,9 +476,9 @@ Phase 2  Structured master prompt                       DONE
    ↓
 Phase 3  Deterministic palette reference                DONE
    ↓
-Phase 4  Constrained SKU edit path                      NEXT / RUNTIME-GATED
+Phase 4  Constrained SKU edit path                      DONE / NOT ADOPTED
    ↓
-Phase 6  Model / quality ablation
+Phase 6  Model / quality runtime capability gate        NEXT
    ↓
 Phase 5  Optional layout-guide ablation
    ↓
