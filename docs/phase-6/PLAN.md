@@ -1,6 +1,6 @@
 # Phase 6 — Model and Quality Runtime Policy
 
-Status: **IN PROGRESS / C0 COMPLETE / C1 REJECTED / C2 EXPLICIT-PATHS NEXT**
+Status: **COMPLETED**
 
 Date: 2026-09-10
 
@@ -60,9 +60,7 @@ num_last_images_to_include: integer | null
 referenced_image_paths: array<string> | null
 ```
 
-The callable declaration did not expose defaults for these controls except that `prompt` is required; Work guidance reported a maximum of 5 for `num_last_images_to_include`.
-
-## C1 — Combined recent-image and explicit-path isolation
+## C1 — Combined selectors
 
 C1 used a fresh Work conversation and performed exactly one Image Gen attempt with:
 
@@ -95,60 +93,44 @@ The project requires exact local reference files for its deterministic MASTER/SK
 
 ## C2 — Explicit reference-path mode
 
-C2 validates the production-relevant alternative selected after C1.
-
-Use a fresh Work conversation with the isolated C2 Skill package and the real HUAWEI `黑.png` source.
-
-The complete `黑.png` is used locally only to produce the deterministic `palette-reference.png` and must not be passed to Image Gen.
-
-Perform exactly one Image Gen call with:
+C2 then tested the production-relevant alternative:
 
 ```text
 prompt = exact C2 empty-background prompt
 referenced_image_paths = [deterministic palette-reference.png]
 ```
 
-Critically:
+with `num_last_images_to_include` omitted entirely from the call.
 
-```text
-num_last_images_to_include
-```
+The complete `黑.png` was used locally only to produce the deterministic palette reference and was not passed to Image Gen.
 
-must be **omitted entirely** from the callable invocation. Do not pass `0`, `null`, or any other value.
-
-The complete `黑.png` must not appear in `referenced_image_paths`.
-
-### C2 acceptance
-
-C2 passes when:
-
-1. the callable accepts explicit `referenced_image_paths` with `num_last_images_to_include` omitted,
-2. exactly one image-model operation occurs,
-3. no fallback or retry occurs,
-4. an accessible generated background is returned,
-5. the complete HUAWEI product source was not explicitly passed to Image Gen.
-
-If the call fails, stop without retry and report:
-
-```text
-EXPLICIT_REFERENCE_PATH_CALL_REJECTED
-```
-
-If the call succeeds, report:
+The call succeeded and returned:
 
 ```text
 EXPLICIT_REFERENCE_PATH_CALL_ACCEPTED
 ```
 
-## Production decision after C2
+with exactly one image-model operation and no retry.
 
-If C2 passes, the production callable contract becomes:
+The returned raw background was directly inspected as:
 
 ```text
-prompt = deterministic scene prompt
-referenced_image_paths = exact explicit authority list
-num_last_images_to_include = OMITTED
+1086 × 1448
+RGBA
+fully opaque
+sha256 d9f5b6fa0389b4a3475352c79509a09ac35e80e725fe5caba7344f697e4a99b9
 ```
+
+## Accepted production callable contract
+
+Production Image Gen calls use:
+
+```text
+prompt = exact deterministic scene prompt
+referenced_image_paths = exact explicit authority list
+```
+
+and **omit `num_last_images_to_include` entirely**.
 
 MASTER:
 
@@ -164,12 +146,20 @@ referenced_image_paths = [ORIGINAL_MASTER_BACKGROUND.png, current-SKU-palette-re
 
 The complete product/SKU artwork remains local and must not be listed in `referenced_image_paths`.
 
-If C2 fails, record the limitation and do not claim explicit-path production control is valid.
-
-## Model / quality decision
+## Unsupported controls
 
 Do not write public API model names or unsupported quality/size/background/output-format/action controls into `SKILL.md`.
 
 Do not run model/quality A/B tests until the Work Skill runtime actually exposes such controls.
+
+## Phase 6 acceptance
+
+Phase 6 is complete because:
+
+1. the real Work callable schema was enumerated in a fresh isolated session,
+2. unsupported controls were excluded from the production contract,
+3. the mutual-exclusion behavior of the two reference selectors was proven,
+4. explicit `referenced_image_paths`-only mode was proven by a real Image Gen call,
+5. the accepted mode matches the Phase 3 deterministic palette-only architecture.
 
 Detailed evidence is in `docs/phase-6/RESULTS.md`.
