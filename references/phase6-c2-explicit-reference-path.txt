@@ -1,0 +1,18 @@
+DELIVERABLE
+Create one portrait 3:4 empty e-commerce background plate only.
+
+REFERENCE ROLE
+Use the provided palette-reference image only to understand color relationships.
+Do not reproduce any product, product silhouette, object, Logo, branding, text, label, icon, packaging, screen, hardware geometry, or recognizable source-image structure.
+
+VISUAL SYSTEM
+Use a clean Google Material Design 3 Classic-inspired abstract background with restrained neumorphic soft-UI geometry, broad calm areas, soft elevation, gentle rounded forms, diffused highlights, and low-contrast shadows.
+
+PALETTE
+Translate the reference colors into a light, restrained, premium background palette. Preserve the overall color relationship without copying literal source content.
+
+EXCLUSIONS
+No product, no product shadow, no Logo, no text, no watermark, no realistic room, no table, no stand, no display platform, no copied object geometry.
+
+OUTPUT
+Return exactly one empty 3:4 background plate suitable for later deterministic local product composition.
