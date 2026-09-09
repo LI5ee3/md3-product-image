@@ -21,6 +21,8 @@ Never infer `TITLE_LINES`. Render each user-supplied title line exactly as writt
 Use `<output root>/<exact complete product name>` as `PRODUCT_DIRECTORY`. Keep all reusable files in `PRODUCT_DIRECTORY/reusable`:
 
 - `layout.json`, `prompt-additions.json`, cropped Logo, and text masks
+- `palette.json` and `palette-reference.png` for the MASTER source
+- source-hash-keyed SKU palette assets under `reusable/palettes/`
 - cached placed product layers and fixed 2D shadows
 - bound master background, product, shadow, scene, and `master.json`
 
@@ -32,9 +34,11 @@ Keep only `output/ORIGINAL_MASTER_FINAL.png` and confirmed sequential `output/SK
 
 Use:
 
-`MEASURE -> BUILD_PROMPT -> IMAGE_GEN_BACKGROUND -> LOCAL_FULL_COMPOSITE -> MASTER_USER_LOCK_OR_REDO`
+`MEASURE -> PALETTE -> BUILD_PROMPT -> IMAGE_GEN_BACKGROUND -> LOCAL_FULL_COMPOSITE -> MASTER_USER_LOCK_OR_REDO`
 
-Each user generation instruction permits exactly one Image Gen call and one full-size composite. Never inspect a generated background separately, decide visual success, or retry automatically. Deterministic failures such as an unreadable file, wrong ratio, master/SKU raster mismatch, hash mismatch, or missing raster stop the run and are reported to the user without another Image Gen call. Assume uploaded product and Logo files are PNG or WEBP with Alpha; do not preflight their format or transparency. If Alpha is unavailable or fully opaque, continue using the full image bounds.
+Each user generation instruction permits exactly one Image Gen call and one full-size composite. Local measurement, palette extraction, hashing, cache verification, prompt construction, and deterministic composition do not count as image-model calls.
+
+Never inspect a generated background separately, decide visual success, or retry automatically. Deterministic failures such as an unreadable file, wrong ratio, master/SKU raster mismatch, hash mismatch, palette-cache mismatch, or missing raster stop the run and are reported to the user without another Image Gen call. Assume uploaded product and Logo files are PNG or WEBP with Alpha; do not preflight their format or transparency. If Alpha is unavailable or fully opaque, continue using the full image bounds.
 
 The generated background's actual raster is authoritative for the local composite. Do not upscale or resample a valid 3:4 MASTER background merely to force the logical `1536 × 2048` layout size. After the user locks the MASTER, its actual raster becomes the required raster for every SKU of that product.
 
@@ -46,7 +50,48 @@ The script creates `PRODUCT_DIRECTORY/reusable/layout.json`, the cropped Logo, a
 
 Treat the canvas recorded by `measure_text.py` as logical normalized layout coordinates. `compose_scene.py` and `compose_image.py` apply those normalized positions to the actual 3:4 raster delivered by Image Gen.
 
-### 2. Build one prompt
+### 2. Prepare or verify the deterministic palette reference
+
+Image Gen must not receive the complete product artwork merely to learn colors.
+
+For a MASTER, run:
+
+```text
+python scripts/palette_cache.py \
+  --source <authoritative-product.png-or-webp> \
+  --product-dir <PRODUCT_DIRECTORY> \
+  --role MASTER
+```
+
+This creates or verifies:
+
+```text
+PRODUCT_DIRECTORY/reusable/palette.json
+PRODUCT_DIRECTORY/reusable/palette-reference.png
+```
+
+For an SKU, run:
+
+```text
+python scripts/palette_cache.py \
+  --source <current-SKU.png-or-webp> \
+  --product-dir <PRODUCT_DIRECTORY> \
+  --role SKU
+```
+
+SKU palette assets are cached by the exact source SHA-256 under:
+
+```text
+PRODUCT_DIRECTORY/reusable/palettes/
+```
+
+Use the `palette_reference` path returned by `palette_cache.py` as the only SKU color reference. Identical source pixels must resolve to the same cached palette asset. Never silently replace or reuse a palette cache whose source identity or deterministic output hash does not verify.
+
+The palette extractor is local and deterministic. Transparent pixels below the fixed alpha threshold do not contribute to palette selection. The generated palette reference contains color bands only—no product silhouette, Logo, text, label, icon, packaging, or hardware geometry.
+
+The authoritative product image remains available locally for the final product composite; palette extraction does not replace or alter the source product artwork.
+
+### 3. Build one prompt
 
 For a master:
 
@@ -62,7 +107,7 @@ python scripts/scene_prompt.py build --mode SKU --layout <reusable/layout.json> 
 
 `scene_prompt.py build` writes the complete Image Gen prompt to stdout. Capture that successful stdout and pass it verbatim to Image Gen in the same tool flow. Never infer, reconstruct, search for, or read a `scene-prompt-*.txt` filename; those files are records only. Stop before Image Gen if the command fails or stdout is empty.
 
-The active master background prompt in `references/image-gen-prompt.txt` is the validated structured prompt. The v2.0 prose prompt is retained only at `references/image-gen-prompt-v2-baseline.txt` for regression, ablation, and fallback comparison; do not use it by default.
+The active master background prompt in `references/image-gen-prompt.txt` is the validated structured palette-only prompt. The v2.0 prose prompt is retained only at `references/image-gen-prompt-v2-baseline.txt` for regression, ablation, and fallback comparison; do not use it by default.
 
 The prompt order is:
 
@@ -76,11 +121,20 @@ The merged safe rectangle contains the measured Logo, every title line, and opti
 
 Prompt additions persist by exact complete product name and accumulate chronologically across the master and all SKUs. Add text only when the user supplies it with a redo instruction. If no addition has ever been supplied, rebuild from the original prompt plus the required SKU, safe-zone, and canonical blocks. Never invent a correction.
 
-For a master, send only the authoritative product image as a palette reference. For an SKU, send exactly `reusable/ORIGINAL_MASTER_BACKGROUND.png` as composition reference and the current SKU product image as palette reference. Image Gen creates only the empty background; never send Logo, text, masks, final composites, or another SKU.
+For a MASTER, send exactly the verified `reusable/palette-reference.png` as the sole Image Gen reference image. Do not send the authoritative product image to Image Gen.
+
+For an SKU, send exactly two Image Gen references:
+
+1. `reusable/ORIGINAL_MASTER_BACKGROUND.png` as the authoritative composition reference
+2. the verified current SKU `palette_reference` returned by `palette_cache.py` as the color-only palette reference
+
+Do not send the current SKU product artwork to Image Gen. It remains local and authoritative for deterministic product composition.
+
+Image Gen creates only the empty background; never send Logo, text, masks, final composites, or another SKU.
 
 When calling Image Gen through `functions.exec`, forward its return value with `generatedImage(result)`. If no accessible raster is delivered, run `record-delivery-failure`, report it, and stop.
 
-### 3. Composite and show one master preview
+### 4. Composite and show one master preview
 
 Run:
 
@@ -92,7 +146,7 @@ The command first verifies that the delivered MASTER background is an exact 3:4 
 
 Do not use visual heuristics to accept, reject, or regenerate. The user owns the visual decision.
 
-### 4. Lock or redo the master
+### 5. Lock or redo the master
 
 Only after the explicit instruction `锁定母版`, run:
 
@@ -111,11 +165,11 @@ python scripts/artifact_flow.py discard-preview --product-dir <PRODUCT_DIRECTORY
 python scripts/scene_prompt.py reject --layout <reusable/layout.json> --mode MASTER --target <id> [--additional-prompt <user text>]
 ```
 
-Then build, generate, composite, show exactly one new preview, and stop. The optional addition is stored and automatically included in this and all later prompts for the product.
+Then verify/reuse the same MASTER palette reference, build, generate, composite, show exactly one new preview, and stop. The optional addition is stored and automatically included in this and all later prompts for the product.
 
-### 5. Create or redo one SKU
+### 6. Create or redo one SKU
 
-After the master is bound, build and generate one SKU background, then run:
+After the master is bound, prepare or verify the current SKU palette reference, build and generate one SKU background, then run:
 
 ```text
 python scripts/artifact_flow.py sku --generated-background <background> --product <current-SKU.png-or-webp> --product-dir <PRODUCT_DIRECTORY>
@@ -131,7 +185,7 @@ Only after an explicit SKU redo request, build with the existing label:
 python scripts/scene_prompt.py build --mode SKU --layout <reusable/layout.json> --master <reusable/master.json> --redo [--target <SKU_VARIANT-X>] [--additional-prompt <user text>]
 ```
 
-Omit `--target` to redo the most recently completed SKU. Reuse the cached product layer and shadow for that label. Generate one replacement background, then run the same `artifact_flow.py sku` command. Keep the existing output unchanged until the replacement composite passes deterministic checks, including the MASTER raster contract, then atomically replace it without changing the filename. A failed redo must preserve the existing final. A redo does not consume a new sequential label.
+Omit `--target` to redo the most recently completed SKU. Reuse the cached product layer, shadow, and source-hash-keyed palette reference for that exact SKU source. Generate one replacement background, then run the same `artifact_flow.py sku` command. Keep the existing output unchanged until the replacement composite passes deterministic checks, including the MASTER raster contract, then atomically replace it without changing the filename. A failed redo must preserve the existing final. A redo does not consume a new sequential label.
 
 For a new SKU after any redo, omit `--redo`; assign the next unused label normally.
 
