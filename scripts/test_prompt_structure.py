@@ -14,6 +14,7 @@ BASELINE = ROOT / "references" / "image-gen-prompt-v2-baseline.txt"
 def main() -> None:
     active = ACTIVE.read_text(encoding="utf-8")
     baseline = BASELINE.read_text(encoding="utf-8")
+    lines = active.splitlines()
 
     headings = [
         "DELIVERABLE",
@@ -28,8 +29,8 @@ def main() -> None:
 
     positions = []
     for heading in headings:
-        assert active.count(heading) == 1, heading
-        positions.append(active.index(heading))
+        assert lines.count(heading) == 1, heading
+        positions.append(lines.index(heading))
     assert positions == sorted(positions)
 
     assert "PALETTE_REFERENCE: authoritative color-only palette reference." in active
