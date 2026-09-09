@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Self-check for the Phase 2 structured Images 2.5 background prompt."""
+"""Self-check for the structured Images 2.5 background prompt."""
 
 from __future__ import annotations
 
@@ -32,8 +32,9 @@ def main() -> None:
         positions.append(active.index(heading))
     assert positions == sorted(positions)
 
-    assert "PRODUCT_REFERENCE: authoritative palette reference only." in active
-    assert "Do not reproduce, redraw, trace, imitate, or transfer the product itself" in active
+    assert "PALETTE_REFERENCE: authoritative color-only palette reference." in active
+    assert "must not be treated as a source of product identity" in active
+    assert "Do not infer or invent a product silhouette" in active
     assert "Do not generate any product, product silhouette" in active
     assert "Return exactly one empty 3:4 background plate." in active
     assert "Google Material Design 3 Classic" in active
@@ -45,7 +46,7 @@ def main() -> None:
     assert "DELIVERABLE" not in baseline
     assert active != baseline
 
-    print("md3-product-image structured prompt self-check passed")
+    print("md3-product-image structured palette-only prompt self-check passed")
 
 
 if __name__ == "__main__":
