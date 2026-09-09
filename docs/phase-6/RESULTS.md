@@ -1,6 +1,6 @@
 # Phase 6 — Model and Quality Runtime Policy Results
 
-Status: **C0 COMPLETE / C1 VALID FAILURE / C2 PENDING**
+Status: **COMPLETED / EXPLICIT REFERENCE PATH MODE ADOPTED**
 
 Date: 2026-09-10
 
@@ -114,21 +114,85 @@ is invalid and must not be adopted.
 
 Because this project requires deterministic, exact local reference files, the production-preferred selector is `referenced_image_paths`.
 
-## C2 requirement
+## C2 result — accepted
 
-C2 must validate one real call with:
+The isolated C2 probe executed exactly one Image Gen call with:
 
 ```text
-referenced_image_paths = [deterministic palette-reference.png]
+referenced_image_paths = [<TEMP_DIR>/palette-reference.png]
+num_last_images_to_include = OMITTED
 ```
 
-while omitting `num_last_images_to_include` entirely from the invocation.
+The complete HUAWEI `黑.png` source was used only for local deterministic palette extraction and was not included in `referenced_image_paths`.
 
-Do not pass zero or null.
+The callable accepted the invocation and returned an accessible empty background.
 
-If accepted, this becomes the callable-boundary production reference contract for MASTER and SKU operations.
+Returned conclusion:
 
-## Current decision
+```text
+EXPLICIT_REFERENCE_PATH_CALL_ACCEPTED
+```
+
+Observed evidence:
+
+```text
+PROBE_PACKAGE_ID: PHASE6-C2-EXPLICIT-REFERENCE-PATH-20260910
+image_model_operations: 1
+palette color count: 7
+```
+
+The returned raw background was inspected directly:
+
+```text
+width: 1086
+height: 1448
+mode: RGBA
+alpha extrema: 255..255
+sha256: d9f5b6fa0389b4a3475352c79509a09ac35e80e725fe5caba7344f697e4a99b9
+```
+
+No MASTER or SKU file was created or modified by the probe.
+
+## Production callable contract
+
+Phase 6 establishes this production Image Gen boundary:
+
+```text
+prompt = exact deterministic scene prompt
+referenced_image_paths = exact explicit authority list
+num_last_images_to_include = OMITTED
+```
+
+MASTER:
+
+```text
+referenced_image_paths = [palette-reference.png]
+```
+
+SKU:
+
+```text
+referenced_image_paths = [ORIGINAL_MASTER_BACKGROUND.png, current-SKU-palette-reference.png]
+```
+
+The complete product/SKU artwork remains local and must not appear in `referenced_image_paths`.
+
+Do not pass `num_last_images_to_include=0` or `null` together with explicit paths. Omit the parameter entirely.
+
+## Unsupported runtime controls
+
+Do not set or document production values for:
+
+- model selection,
+- quality / effort,
+- output size / resolution,
+- background / transparency,
+- output format,
+- image action / mode.
+
+Those controls are not directly exposed by the tested Work + Skill callable interface.
+
+## Final decision
 
 ```text
 Runtime control schema: CONFIRMED
@@ -144,5 +208,6 @@ Explicit reference-image paths configurable: YES
 Both selectors may be combined: NO
 Run model/quality A/B: NO
 Adopt num_last_images_to_include=0: NO
-C2 explicit referenced_image_paths-only validation: PENDING
+Adopt explicit referenced_image_paths-only mode: YES
+Phase 6: COMPLETED
 ```
