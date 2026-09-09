@@ -1,4 +1,0 @@
-interface:
-  display_name: "Phase 6 Explicit Reference Path Probe C2"
-  short_description: "验证 Work 仅使用 referenced_image_paths 时的调用行为"
-  default_prompt: "使用 $phase6-explicit-reference-path-probe-c2 执行 Phase 6 C2 显式引用路径探针；必须省略 num_last_images_to_include，且只允许一次 Image Gen 调用"

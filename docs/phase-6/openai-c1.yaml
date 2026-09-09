@@ -1,4 +1,0 @@
-interface:
-  display_name: "Phase 6 Reference Isolation C1"
-  short_description: "验证 num_last_images_to_include=0 与显式 palette reference"
-  default_prompt: "使用 $phase6-reference-isolation-probe-c1 执行 Phase 6 C1 Reference Isolation Probe；只允许一次 Image Gen 调用，必须显式设置 num_last_images_to_include=0"

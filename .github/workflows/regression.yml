@@ -1,15 +1,22 @@
-name: Phase 7 consolidated regression
+name: Regression
 
 on:
   workflow_dispatch:
   push:
     branches:
+      - main
       - images-2.5-roadmap
     paths:
       - 'SKILL.md'
       - 'references/**'
       - 'scripts/**'
-      - '.github/workflows/phase7-consolidated-regression.yml'
+      - '.github/workflows/regression.yml'
+  pull_request:
+    paths:
+      - 'SKILL.md'
+      - 'references/**'
+      - 'scripts/**'
+      - '.github/workflows/regression.yml'
 
 jobs:
   regression:

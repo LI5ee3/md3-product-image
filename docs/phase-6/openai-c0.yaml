@@ -1,4 +1,0 @@
-interface:
-  display_name: "Phase 6 Runtime Control Probe R2"
-  short_description: "隔离枚举 Work 实际暴露的 Image Gen 运行时控制"
-  default_prompt: "使用 $phase6-runtime-control-probe-r2 执行 Phase 6 C0 R2；必须先确认 PROBE_PACKAGE_ID=PHASE6-C0-R2-20260910，只读取当前 Work 实际暴露的 Image Gen 调用接口，禁止执行任何图像模型调用"
