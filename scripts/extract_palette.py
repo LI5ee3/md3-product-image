@@ -169,15 +169,36 @@ def select_palette(
         selected.append(best)
         remaining.remove(best)
 
-    selected = selected[:colors]
-    selected.sort(key=lambda row: (-row["source_weight"], row["rgb"]))
-    return selected
+    return selected[:colors]
+
+
+def assign_reference_weights(rows: list[dict], selected: list[dict]) -> list[dict]:
+    if not selected:
+        raise ValueError("PALETTE_EMPTY")
+    assigned = [0.0] * len(selected)
+    for row in rows:
+        nearest_index = min(
+            range(len(selected)),
+            key=lambda index: (
+                distance_sq(row["rgb"], selected[index]["rgb"]),
+                index,
+            ),
+        )
+        assigned[nearest_index] += row["source_weight"]
+
+    weighted = []
+    for index, row in enumerate(selected):
+        copy = dict(row)
+        copy["reference_weight"] = assigned[index]
+        weighted.append(copy)
+    weighted.sort(key=lambda row: (-row["reference_weight"], row["rgb"]))
+    return weighted
 
 
 def render_reference(colors: list[dict], output: Path) -> None:
     if output.exists():
         raise ValueError(f"REFUSE_OVERWRITE: {output}")
-    total = sum(row["source_weight"] for row in colors)
+    total = sum(row["reference_weight"] for row in colors)
     if total <= 0:
         raise ValueError("PALETTE_WEIGHT_INVALID")
 
@@ -185,7 +206,7 @@ def render_reference(colors: list[dict], output: Path) -> None:
     cumulative = 0.0
     left = 0
     for index, row in enumerate(colors):
-        cumulative += row["source_weight"] / total
+        cumulative += row["reference_weight"] / total
         right = REFERENCE_WIDTH if index == len(colors) - 1 else round(cumulative * REFERENCE_WIDTH)
         right = max(left + 1, min(REFERENCE_WIDTH, right))
         band = Image.new("RGB", (right - left, REFERENCE_HEIGHT), row["rgb"])
@@ -234,10 +255,9 @@ def main() -> None:
             accent_distance=DEFAULT_ACCENT_DISTANCE,
             min_accent_weight=DEFAULT_MIN_ACCENT_WEIGHT,
         )
-        if not selected:
-            raise ValueError("PALETTE_EMPTY")
+        selected = assign_reference_weights(rows, selected)
 
-        selected_coverage = sum(row["source_weight"] for row in selected)
+        selected_source_coverage = sum(row["source_weight"] for row in selected)
         palette_colors = []
         for rank, row in enumerate(selected, 1):
             palette_colors.append(
@@ -246,7 +266,7 @@ def main() -> None:
                     "hex": rgb_hex(row["rgb"]),
                     "rgb": list(row["rgb"]),
                     "source_weight": round(row["source_weight"], 8),
-                    "reference_weight": round(row["source_weight"] / selected_coverage, 8),
+                    "reference_weight": round(row["reference_weight"], 8),
                 }
             )
 
@@ -269,8 +289,10 @@ def main() -> None:
                 "dominant_min_rgb_distance": DEFAULT_DOMINANT_DISTANCE,
                 "accent_min_rgb_distance": DEFAULT_ACCENT_DISTANCE,
                 "minimum_accent_source_weight": DEFAULT_MIN_ACCENT_WEIGHT,
+                "reference_weighting": "nearest-selected-color assignment over all visible bins",
             },
-            "selected_source_coverage": round(selected_coverage, 8),
+            "selected_source_coverage": round(selected_source_coverage, 8),
+            "reference_weight_sum": round(sum(row["reference_weight"] for row in selected), 8),
             "colors": palette_colors,
         }
 
