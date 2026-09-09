@@ -1,12 +1,12 @@
 # Native Size Validation
 
-Status: **PARTIAL PASS — API CONTRACT VERIFIED; SKILL RUNTIME PIXEL OUTPUT NOT YET EMPIRICALLY VERIFIED**
+Status: **API PASS / CURRENT SKILL RUNTIME FAIL FOR EXACT NATIVE SIZE**
 
 Date: 2026-09-09
 
-This Phase 0 check evaluates whether the canonical `1536 × 2048` canvas used by `md3-product-image` is valid for GPT Image 2.5 and whether the current Skill runtime exposes a compatible size control.
+This Phase 0 check evaluates whether the canonical `1536 × 2048` canvas used by `md3-product-image` is valid for GPT Image 2.5 and whether the current Skill runtime actually returns that exact raster size.
 
-No production code or Skill behavior is changed by this validation.
+No production code or Skill behavior was changed by this validation.
 
 ## Canonical project size
 
@@ -28,13 +28,12 @@ Pixel count:
 
 The current OpenAI image-generation documentation states that GPT Image 2.5 models support custom dimensions expressed as `WIDTHxHEIGHT` strings.
 
-Documented constraints:
+Documented constraints include:
 
 - width and height must both be multiples of 16,
 - aspect ratio must be between `1:3` and `3:1`,
 - neither edge may exceed `3840` pixels,
-- total pixel count must be between `655,360` and `8,294,400` pixels,
-- resolutions above `2560 × 1440` are experimental.
+- total pixel count must be between `655,360` and `8,294,400` pixels.
 
 `1536 × 2048` satisfies every hard constraint:
 
@@ -49,8 +48,6 @@ Documented constraints:
 
 Therefore `1536x2048` is a valid GPT Image 2.5 custom-size request under the documented API contract.
 
-Because the portrait height is 2048, this resolution is not above the documentation's `2560 × 1440` experimental boundary by total long-edge comparison in the same orientation-independent sense normally intended for that note; nevertheless the Skill must rely on actual output validation rather than assuming exact raster delivery from documentation alone.
-
 ## Current Skill runtime contract
 
 The image-generation tool exposed to the current Skill runtime includes a `size` argument represented as a string.
@@ -61,35 +58,63 @@ This is structurally compatible with the documented GPT Image 2.5 custom-size fo
 1536x2048
 ```
 
-However, the runtime tool schema does not enumerate accepted size values and does not itself guarantee that the returned raster will be exactly the requested dimensions.
+However, schema compatibility is not sufficient for this project. The delivered raster must be inspected because the local deterministic composition pipeline depends on exact pixel dimensions.
 
-Therefore the following distinction is mandatory:
+## Empirical runtime probe
 
-- **API validity:** verified.
-- **Current runtime exposes a size field:** verified.
-- **Current runtime empirically returns exactly 1536 × 2048 pixels:** not yet verified.
+A disposable image-generation probe was issued through the current ChatGPT image runtime with the target size `1536x2048`.
 
-## ChatGPT product-level evidence
+The delivered PNG was then opened directly with Pillow and inspected from the actual raster file rather than trusting any generated text or visual appearance.
 
-Current ChatGPT Images documentation states that ChatGPT Images 2.5 can generate images in any aspect ratio and supports choosing or requesting a desired aspect ratio.
+Observed raster properties:
 
-This supports use of a 3:4 request at the product level, but does not replace pixel-dimension verification for the Skill workflow.
+```text
+Requested size: 1536 × 2048
+Returned size:  1448 × 1086
+Returned ratio: 4:3 landscape
+Format:         PNG
+Color mode:     RGB
+Alpha channel:  no
+```
 
-## Required empirical probe
+Observed result:
 
-The remaining runtime test is deliberately narrow:
+- exact width match: **FAIL**
+- exact height match: **FAIL**
+- requested 3:4 orientation preserved: **FAIL**
+- PNG delivery: **PASS**
+- opaque RGB raster: **PASS**
 
-1. invoke the current Skill image-generation runtime once with `size="1536x2048"`,
-2. use a trivial disposable prompt unrelated to production visual quality,
-3. inspect the delivered raster dimensions,
-4. record the exact returned width and height,
-5. mark PASS only if the raster is exactly `1536 × 2048`,
-6. do not retry automatically if the request fails or returns another size.
+The runtime therefore did not deliver the requested canonical canvas size in this test.
 
-The probe must not be used to judge style, palette, composition, or quality. Those are separate Phase 0 visual-baseline tasks.
+Disposable outputs inspected during this runtime check consistently resolved to `1448 × 1086`, which reinforces that the current ChatGPT image runtime should not be treated as a pixel-exact custom-size interface for this Skill.
+
+## Important interpretation
+
+This result does **not** mean GPT Image 2.5 API custom sizes are unsupported.
+
+It means only that the **current Skill/ChatGPT image runtime available in this environment did not honor `1536x2048` as the final delivered raster size**.
+
+The distinction is:
+
+- GPT Image 2.5 API contract accepts `1536x2048`: **verified**.
+- Current Skill runtime exposes a `size` field: **verified**.
+- Current Skill runtime empirically returns exactly `1536 × 2048`: **failed in this probe**.
+
+## Consequence for Phase 1
+
+Phase 1 must not assume native `1536 × 2048` delivery from the current Skill runtime.
+
+Therefore:
+
+1. do not remove the existing resize/fallback path,
+2. add deterministic validation of every returned background raster before composition,
+3. retain an explicit conversion path to the canonical `1536 × 2048` canvas when the runtime returns another size,
+4. do not silently crop or distort; conversion policy must be defined and tested,
+5. keep the native-size path conditional so it can become the preferred path later if the runtime begins returning the exact requested dimensions.
 
 ## Decision
 
-At this point it is safe to state that `1536 × 2048` is a documented GPT Image 2.5-compatible size and that the current Skill runtime has a compatible size parameter.
+**Native custom size is supported by the GPT Image 2.5 API contract but is not reliable as an exact delivered raster in the current Skill runtime.**
 
-It is **not yet safe** to remove any resize/fallback path or to declare native-size delivery complete until one actual Skill-runtime raster has been inspected and confirmed to be exactly `1536 × 2048`.
+For this repository, `1536 × 2048` remains the canonical local composition size, not a guaranteed image-generation output size.
