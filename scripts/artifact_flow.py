@@ -19,7 +19,10 @@ VERSION_COLOR = "5A5A5A"
 
 from common import (
     atomic_write,
+    normalize_raster_contract,
     read_json,
+    require_matching_raster,
+    require_three_four_raster,
     resolve_entry,
     sha256_file,
     verify_information_assets,
@@ -187,6 +190,7 @@ def accept_scene_attempt(
     atomic_write(scene_attempt_path(product_dir), state)
     return result
 
+
 def validate_information_colors(layout: dict, information: dict) -> None:
     elements = layout.get("elements")
     if not isinstance(elements, dict):
@@ -256,6 +260,12 @@ def create_preview(args: argparse.Namespace) -> None:
         if not product_source.is_file() or sha256_file(product_source) != expected_product_hash:
             raise ValueError("MASTER_PRODUCT_REFERENCE_MISMATCH")
         copy_new(args.generated_background, paths["background"])
+        background_raster = require_three_four_raster(paths["background"], "MASTER_BACKGROUND")
+        raster = {
+            "width": int(background_raster["width"]),
+            "height": int(background_raster["height"]),
+            "ratio": "3:4",
+        }
         scene_render = scene_composite_info(run_scene_compose(
             paths["background"],
             product_source,
@@ -263,12 +273,16 @@ def create_preview(args: argparse.Namespace) -> None:
             paths["product"],
             paths["shadow"],
         ))
+        require_matching_raster(paths["product"], raster, "MASTER_PRODUCT_LAYER")
+        require_matching_raster(paths["shadow"], raster, "MASTER_SHADOW")
+        require_matching_raster(paths["scene"], raster, "MASTER_SCENE")
         render = run_compose(
             paths["scene"],
             layout_path,
             paths["final"],
             "CANDIDATE",
         )
+        require_matching_raster(paths["final"], raster, "MASTER_FINAL")
         information = {
             "title_color": render.get("title_color"),
             "version_color": render.get("version_color"),
@@ -286,6 +300,7 @@ def create_preview(args: argparse.Namespace) -> None:
                 "scene": relative_entry(paths["scene"], product_dir),
                 "final": relative_entry(paths["final"], product_dir),
             },
+            "raster": raster,
             "information": information,
             "scene_composite": scene_render,
             "scene_attempt": attempt_info,
@@ -319,6 +334,11 @@ def load_preview(product_dir: Path, candidate_id: str) -> tuple[dict, dict[str, 
     }
     for label, path in expected.items():
         resolve_entry(files.get(label), product_dir, path, label)
+    raster = normalize_raster_contract(manifest.get("raster"), "PREVIEW_RASTER")
+    for label in ("background", "product", "shadow", "scene", "final"):
+        require_matching_raster(expected[label], raster, f"PREVIEW_{label.upper()}")
+    manifest = dict(manifest)
+    manifest["raster"] = raster
     return manifest, paths
 
 
@@ -353,6 +373,7 @@ def bind_candidate(args: argparse.Namespace) -> None:
     attempt_info = current_attempt_info(product_dir, candidate_id)
     if preview.get("scene_attempt") != attempt_info:
         raise ValueError("PREVIEW_ATTEMPT_MISMATCH")
+    raster = normalize_raster_contract(preview.get("raster"), "PREVIEW_RASTER")
     targets = {
         "background": reusable_dir / "ORIGINAL_MASTER_BACKGROUND.png",
         "product": reusable_dir / "ORIGINAL_MASTER_PRODUCT.png",
@@ -368,6 +389,7 @@ def bind_candidate(args: argparse.Namespace) -> None:
     try:
         for label in ("background", "product", "shadow", "scene", "final"):
             copy_new(preview_files[label], targets[label])
+            require_matching_raster(targets[label], raster, f"MASTER_{label.upper()}")
         information = preview.get("information")
         if not isinstance(information, dict):
             raise ValueError("CANDIDATE_INFORMATION_INVALID")
@@ -384,6 +406,7 @@ def bind_candidate(args: argparse.Namespace) -> None:
                 "scene": relative_entry(targets["scene"], product_dir),
                 "final": relative_entry(targets["final"], product_dir),
             },
+            "raster": raster,
             "information": {
                 "title_color": information["title_color"],
                 "version_color": information["version_color"],
@@ -438,7 +461,10 @@ def pending_sku(product_dir: Path) -> tuple[str, dict]:
 def create_sku(args: argparse.Namespace) -> None:
     product_dir, layout_path, layout = load_product(args.product_dir)
     ensure_output_allowed(product_dir)
-    verify_master(product_dir)
+    master = verify_master(product_dir)
+    expected_raster = normalize_raster_contract(master.get("raster"), "MASTER_RASTER")
+    generated_background = Path(args.generated_background).expanduser().resolve()
+    require_matching_raster(generated_background, expected_raster, "SKU_BACKGROUND")
     sku_label, pending_info = pending_sku(product_dir)
     redo = bool(pending_info["run"].get("redo"))
     attempt_info = attempt_record(pending_info)
@@ -462,16 +488,20 @@ def create_sku(args: argparse.Namespace) -> None:
     backup = final_output.with_name(f".{final_output.name}.previous")
     cleanup([replacement, backup])
     try:
-        copy_new(args.generated_background, paths["background"])
+        copy_new(generated_background, paths["background"])
         scene_render = scene_composite_info(run_scene_compose(
             paths["background"], product_source, paths["scene"],
             paths["product"], paths["shadow"],
         ))
+        require_matching_raster(paths["product"], expected_raster, "SKU_PRODUCT_LAYER")
+        require_matching_raster(paths["shadow"], expected_raster, "SKU_SHADOW")
+        require_matching_raster(paths["scene"], expected_raster, "SKU_SCENE")
         if not layers_exist:
             atomic_write(paths["layers"], {"source_sha256": product_hash}, new=True)
         render = run_compose(
             paths["scene"], layout_path, paths["final"], "SKU_PREVIEW",
         )
+        require_matching_raster(paths["final"], expected_raster, "SKU_FINAL")
         information = {
             "title_color": render.get("title_color"),
             "version_color": render.get("version_color"),
@@ -484,6 +514,7 @@ def create_sku(args: argparse.Namespace) -> None:
                 label: relative_entry(paths[label], product_dir)
                 for label in ("background", "product", "shadow", "scene", "final")
             },
+            "raster": expected_raster,
             "information": information,
             "scene_composite": scene_render,
             "scene_attempt": attempt_info,
