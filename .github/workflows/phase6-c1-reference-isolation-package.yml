@@ -1,0 +1,50 @@
+name: Phase 6 C1 reference isolation probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - images-2.5-roadmap
+    paths:
+      - 'docs/phase-6/WORK_TEST_SKILL_C1.md'
+      - 'docs/phase-6/openai-c1.yaml'
+      - 'references/phase6-c1-reference-isolation.txt'
+      - 'scripts/extract_palette.py'
+      - '.github/workflows/phase6-c1-reference-isolation-package.yml'
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Pillow
+        run: python -m pip install --disable-pip-version-check pillow
+
+      - name: Compile palette extractor
+        run: python -m py_compile scripts/extract_palette.py
+
+      - name: Build C1 Work test package
+        run: |
+          set -euo pipefail
+          mkdir -p package/agents package/references package/scripts
+          cp docs/phase-6/WORK_TEST_SKILL_C1.md package/SKILL.md
+          cp docs/phase-6/openai-c1.yaml package/agents/openai.yaml
+          cp references/phase6-c1-reference-isolation.txt package/references/
+          cp scripts/extract_palette.py package/scripts/
+          (cd package && zip -r ../phase6-c1-reference-isolation.zip .)
+          unzip -l phase6-c1-reference-isolation.zip
+
+      - name: Upload C1 Work test Skill ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase6-c1-reference-isolation
+          path: phase6-c1-reference-isolation.zip
+          if-no-files-found: error
+          retention-days: 30
