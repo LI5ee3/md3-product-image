@@ -1,6 +1,6 @@
 ---
 name: md3-product-image-phase3-palette-master
-ndescription: "Phase 3 MASTER-only ablation for md3-product-image. Generate the same structured MD3 MASTER while sending only a deterministic palette-reference image to Image Gen; keep the authoritative product image local for deterministic composition."
+description: "Phase 3 MASTER-only ablation for md3-product-image. Generate the same structured MD3 MASTER while sending only a deterministic palette-reference image to Image Gen; keep the authoritative product image local for deterministic composition."
 ---
 
 # MD3 Product Image — Phase 3 Palette-Only MASTER Test
