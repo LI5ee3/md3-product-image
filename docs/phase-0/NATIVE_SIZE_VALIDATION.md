@@ -1,109 +1,78 @@
 # Native Size Validation
 
-Status: **REAL PRODUCTION OUTPUT OBSERVED AT 1086 × 1448 / 1536 × 2048 UI REPORT MISMATCH**
+Status: **REAL WORK OUTPUT STABLE AT 1086 × 1448 ACROSS MASTER + 2 SKU / UI REPORTS 1536 × 2048**
 
 Date: 2026-09-09
 
-This Phase 0 check evaluates whether the canonical `1536 × 2048` canvas used by `md3-product-image` is valid for GPT Image 2.5 and what raster size is actually delivered by the real Skill runtime.
+This Phase 0 check separates the repository's logical layout canvas from the raster actually delivered by the real ChatGPT Work Skill runtime.
 
-No production code or Skill behavior was changed by this validation.
+No production behavior was changed during this validation.
 
-## Canonical project size
+## 1. Logical layout canvas
 
-The existing project layout uses a canonical portrait canvas of:
+The existing repository measures text and information placement on a logical canvas of:
 
 ```text
 1536 × 2048
 ```
 
-This is exactly 3:4.
+This is exactly 3:4. The layout rectangles are stored as normalized coordinates, so later local composition can scale them to another exact 3:4 raster.
 
-Pixel count:
+## 2. GPT Image 2.5 API contract
 
-```text
-1536 × 2048 = 3,145,728 pixels
-```
+`1536x2048` is valid under the documented GPT Image 2.5 custom-size constraints. API support alone does not prove that the ChatGPT Work Skill bridge requests or returns that exact raster.
 
-## OpenAI API contract
+## 3. Real production Skill evidence
 
-The current OpenAI image-generation documentation states that GPT Image 2.5 models support custom dimensions expressed as `WIDTHxHEIGHT` strings.
+The authoritative HUAWEI WATCH FIT 5 Pro baseline was generated with `md3-product-image v2.0` in ChatGPT Work.
 
-Documented constraints include:
+Work reported `1536×2048 (3:4)` for the generated outputs. The actual downloaded PNG files were inspected directly.
 
-- width and height must both be multiples of 16,
-- aspect ratio must be between `1:3` and `3:1`,
-- neither edge may exceed `3840` pixels,
-- total pixel count must be between `655,360` and `8,294,400` pixels.
+| Output | Actual raster | Mode | Alpha | SHA-256 |
+| --- | --- | --- | --- | --- |
+| locked black MASTER | `1086×1448` | RGBA | fully opaque | `083d625d2a039ca565fbaf548c55e58714c6770601b1fcb1141f5360201f286f` |
+| orange `SKU_VARIANT-A` | `1086×1448` | RGBA | fully opaque | `9f8be325c1d6ac486024393629ebd18650c684d9af936b9f01ec600a599d42ff` |
+| white `SKU_VARIANT-B` | `1086×1448` | RGBA | fully opaque | `22f16d60736c81a6738a987b4f1d4d5ff29460f4a16a3c0ed284f1f3643ed66b` |
 
-`1536 × 2048` satisfies every hard constraint:
-
-| Constraint | Requirement | 1536 × 2048 | Result |
-| --- | --- | --- | --- |
-| Width multiple | multiple of 16 | 1536 / 16 = 96 | PASS |
-| Height multiple | multiple of 16 | 2048 / 16 = 128 | PASS |
-| Aspect ratio | between 1:3 and 3:1 | 3:4 | PASS |
-| Maximum edge | <= 3840 | 2048 | PASS |
-| Minimum pixels | >= 655,360 | 3,145,728 | PASS |
-| Maximum pixels | <= 8,294,400 | 3,145,728 | PASS |
-
-Therefore `1536x2048` is a valid GPT Image 2.5 custom-size request under the documented API contract.
-
-## Invalidated conversational probes
-
-Earlier project-conversation probes intended to test `1536 × 2048` and `1086 × 1448` are excluded from evidence because the callable chat image surface did not demonstrably carry the requested explicit size parameter. Those probes remain invalid and are not retroactively scored.
-
-## Real production Skill evidence
-
-A real `md3-product-image v2.0` run was executed in ChatGPT Work using the authoritative HUAWEI source set.
-
-The Skill reported the logical/final master size in its UI as:
+All three real production outputs therefore resolve to the same exact 3:4 raster:
 
 ```text
-1536 × 2048 (3:4)
+1086 × 1448
 ```
 
-The user then downloaded/supplied the locked `ORIGINAL_MASTER_FINAL.png` result for direct raster inspection.
+This satisfies the previously requested three-output stability check using real Skill production artifacts rather than conversational probes.
 
-The delivered PNG is:
+## 4. Why the current pipeline still works
 
-```text
-width: 1086
-height: 1448
-aspect ratio: 3:4
-format: PNG
-mode: RGBA
-alpha extrema: 255..255
-SHA-256: 083d625d2a039ca565fbaf548c55e58714c6770601b1fcb1141f5360201f286f
-```
+The repository currently has two different size concepts:
 
-This is a real production Skill output and therefore materially stronger evidence than the earlier conversational probes.
+1. `measure_text.py` creates a `1536×2048` logical layout and stores normalized element rectangles.
+2. `compose_scene.py` uses the generated background's actual raster as the local composition canvas and only requires exact 3:4.
+3. `compose_image.py` scales the normalized Logo/text rectangles to that actual scene raster.
 
-## Interpretation
+Therefore a `1086×1448` generated background naturally produces a `1086×1448` final composite without any required resize back to `1536×2048`.
 
-The current evidence demonstrates a mismatch between the Work/Skill-reported logical canvas and the raster delivered back to the user:
+The Work message reporting `1536×2048` should not be treated as proof of the downloadable raster size.
 
-```text
-reported logical/final canvas: 1536 × 2048
-actual delivered PNG raster:   1086 × 1448
-```
+## 5. Invalidated earlier probes
 
-Both are exact 3:4 canvases, but they are not pixel-identical resolutions.
+Earlier project-conversation attempts to test explicit `1536x2048` or `1086x1448` requests remain excluded. Those calls did not demonstrably carry the intended explicit size argument and were not equivalent to the real Skill production path.
 
-This means Phase 1 must not assume that a `1536 × 2048` logical composition canvas guarantees a `1536 × 2048` user-visible PNG.
+## 6. Phase 1 decision
 
-The observation also provides the first valid real-runtime evidence that `1086 × 1448` is an actual production output size in the current Work/Skill path.
+Phase 1 must not force `1536×2048` merely because it is the logical measurement canvas.
 
-It does **not** yet establish that explicitly requesting `1086x1448` will always return that size, nor that every run is stable at this resolution. Stability still requires repeated real production outputs.
+Instead:
 
-## Consequence for Phase 1
+- keep `1536×2048` as the deterministic logical layout canvas;
+- accept the locked MASTER background's actual exact-3:4 raster as the product's delivery raster contract;
+- require every later SKU generated background to match the locked MASTER background width and height exactly;
+- reject a same-ratio but different-size SKU background deterministically;
+- never trigger an automatic image-generation retry after a raster mismatch;
+- continue recording the actual delivered raster rather than trusting UI text.
 
-1. Keep `1536 × 2048` as the canonical deterministic logical composition canvas unless later evidence supports changing it.
-2. Add final-raster dimension inspection as a required validation step.
-3. Do not claim native exact `1536 × 2048` delivery in the current Work runtime.
-4. Preserve resize/output-normalization logic until the source of the `1536×2048 -> 1086×1448` conversion is identified.
-5. Treat `1086 × 1448` as an observed production delivery size, not yet a guaranteed requested-size contract.
-6. Repeat the same inspection for the orange and white SKU outputs to determine whether the delivered raster size is stable across variants.
+This preserves current working output while preventing mixed-resolution MASTER/SKU sets.
 
-## Decision
+## 7. Current conclusion
 
-**GPT Image 2.5 API accepts the canonical custom size, but the real ChatGPT Work Skill run reported 1536×2048 while delivering a 1086×1448 PNG. Phase 1 must explicitly account for this runtime/output normalization behavior.**
+**The real v2.0 Work path is stable at 1086×1448 across one MASTER and two SKU outputs. The repository's 1536×2048 value is a logical layout canvas, not the verified downloadable raster. Phase 1 should lock SKU raster dimensions to the actual bound MASTER rather than force an unsupported 1536×2048 delivery size.**
