@@ -1,0 +1,67 @@
+name: Release v2.0
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/release-v2.0.yml
+
+permissions:
+  contents: write
+
+env:
+  TARGET_SHA: 1298885427ad905bb874e97531fef0fed9703ad4
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release target
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TARGET_SHA }}
+
+      - name: Build Skill package
+        run: |
+          git archive \
+            --format=zip \
+            --prefix=md3-product-image/ \
+            --output=md3-product-image-v2.0.zip \
+            HEAD \
+            SKILL.md LICENSE agents assets references scripts
+
+      - name: Prepare release notes
+        run: |
+          cat > release-notes.md <<'EOF'
+          ## What's Changed
+
+          First stable release of **md3-product-image**, versioned as **v2.0** to align with the Images 2.0 generation capabilities that the Skill is built around.
+
+          - Added a complete workflow for creating 3:4 Google Classic MD3 e-commerce product images.
+          - Added Images 2.0-based background generation with deterministic local composition of products, shadows, logos, and typography.
+          - Added user-controlled master preview and explicit master locking.
+          - Added automatic sequential SKU variant generation from a locked master.
+          - Added master and SKU redo workflows with persistent prompt additions.
+          - Added fixed product placement, 50° 2D shadow, logo, and Roboto Bold typography rules for consistent output.
+          - Added reusable per-product layout, assets, backgrounds, and composition state.
+          - Added deterministic output handling that preserves confirmed results when a redo fails.
+          - Added bundled Roboto Bold assets and the supporting scripts and references required by the Skill.
+          EOF
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view v2.0 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release v2.0 already exists."
+            exit 0
+          fi
+
+          gh release create v2.0 \
+            md3-product-image-v2.0.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$TARGET_SHA" \
+            --title "md3-product-image v2.0" \
+            --notes-file release-notes.md \
+            --latest
