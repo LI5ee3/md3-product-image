@@ -1,10 +1,10 @@
 # Native Size Validation
 
-Status: **API PASS / CURRENT SKILL RUNTIME FAIL FOR EXACT NATIVE SIZE**
+Status: **API PASS / CURRENT SKILL RUNTIME EXACT-SIZE OUTPUT UNVERIFIED**
 
 Date: 2026-09-09
 
-This Phase 0 check evaluates whether the canonical `1536 × 2048` canvas used by `md3-product-image` is valid for GPT Image 2.5 and whether the current Skill runtime actually returns that exact raster size.
+This Phase 0 check evaluates whether the canonical `1536 × 2048` canvas used by `md3-product-image` is valid for GPT Image 2.5 and whether the current Skill runtime actually returns an exact requested raster size.
 
 No production code or Skill behavior was changed by this validation.
 
@@ -52,69 +52,63 @@ Therefore `1536x2048` is a valid GPT Image 2.5 custom-size request under the doc
 
 The image-generation tool exposed to the current Skill runtime includes a `size` argument represented as a string.
 
-This is structurally compatible with the documented GPT Image 2.5 custom-size form:
+This is structurally compatible with the documented GPT Image 2.5 custom-size form.
 
-```text
-1536x2048
-```
+Schema compatibility alone is not sufficient for this project. The delivered raster must be inspected because the local deterministic composition pipeline depends on exact pixel dimensions.
 
-However, schema compatibility is not sufficient for this project. The delivered raster must be inspected because the local deterministic composition pipeline depends on exact pixel dimensions.
+## Invalidated probe record
 
-## Empirical runtime probe
+An earlier Phase 0 note incorrectly marked the current Skill runtime as failing exact `1536 × 2048` output.
 
-A disposable image-generation probe was issued through the current ChatGPT image runtime with the target size `1536x2048`.
+That conclusion is withdrawn.
 
-The delivered PNG was then opened directly with Pillow and inspected from the actual raster file rather than trusting any generated text or visual appearance.
+The generated raster that was inspected was real, but the image-generation call used for that probe did **not** actually carry the intended explicit `size="1536x2048"` argument. Therefore the observed `1448 × 1086` output cannot be used as evidence that the runtime rejected or ignored `1536 × 2048`.
 
-Observed raster properties:
+The same issue affected a later sequence intended to test `1086 × 1448`: the generated images were influenced by the conversation context and did not constitute valid explicit-size probes.
 
-```text
-Requested size: 1536 × 2048
-Returned size:  1448 × 1086
-Returned ratio: 4:3 landscape
-Format:         PNG
-Color mode:     RGB
-Alpha channel:  no
-```
+Those outputs are excluded from the Phase 0 evidence set and must not be scored as PASS or FAIL.
 
-Observed result:
+## Current verified state
 
-- exact width match: **FAIL**
-- exact height match: **FAIL**
-- requested 3:4 orientation preserved: **FAIL**
-- PNG delivery: **PASS**
-- opaque RGB raster: **PASS**
-
-The runtime therefore did not deliver the requested canonical canvas size in this test.
-
-Disposable outputs inspected during this runtime check consistently resolved to `1448 × 1086`, which reinforces that the current ChatGPT image runtime should not be treated as a pixel-exact custom-size interface for this Skill.
-
-## Important interpretation
-
-This result does **not** mean GPT Image 2.5 API custom sizes are unsupported.
-
-It means only that the **current Skill/ChatGPT image runtime available in this environment did not honor `1536x2048` as the final delivered raster size**.
-
-The distinction is:
+The distinction is now:
 
 - GPT Image 2.5 API contract accepts `1536x2048`: **verified**.
+- `1536 × 2048` satisfies the documented custom-size constraints: **verified**.
 - Current Skill runtime exposes a `size` field: **verified**.
-- Current Skill runtime empirically returns exactly `1536 × 2048`: **failed in this probe**.
+- Current Skill runtime empirically returns exactly `1536 × 2048` when that explicit argument is applied: **not yet verified**.
+- Current Skill runtime empirically returns exactly `1086 × 1448` when that explicit argument is applied: **not yet verified**.
+
+## Required valid probe
+
+A valid runtime probe must satisfy all of the following:
+
+1. the tool call must explicitly carry the target `size` argument,
+2. the generated content must be disposable and unrelated to the evaluation result,
+3. the returned file must be inspected directly with Pillow or an equivalent raster reader,
+4. generated text claiming a dimension must never be treated as evidence,
+5. no automatic retry is allowed,
+6. each result must record requested size, actual width, actual height, format, and alpha mode.
+
+For the proposed fallback-sized experiment, run three independent calls with:
+
+```text
+size="1086x1448"
+```
+
+and mark that candidate stable only if all three returned files are exactly `1086 × 1448`.
 
 ## Consequence for Phase 1
 
-Phase 1 must not assume native `1536 × 2048` delivery from the current Skill runtime.
-
-Therefore:
+Until a valid explicit-size probe is completed:
 
 1. do not remove the existing resize/fallback path,
 2. add deterministic validation of every returned background raster before composition,
-3. retain an explicit conversion path to the canonical `1536 × 2048` canvas when the runtime returns another size,
-4. do not silently crop or distort; conversion policy must be defined and tested,
-5. keep the native-size path conditional so it can become the preferred path later if the runtime begins returning the exact requested dimensions.
+3. keep `1536 × 2048` as the canonical local composition canvas,
+4. do not assume either `1536 × 2048` or `1086 × 1448` is a guaranteed generation raster,
+5. keep native-size behavior conditional on empirical runtime evidence.
 
 ## Decision
 
-**Native custom size is supported by the GPT Image 2.5 API contract but is not reliable as an exact delivered raster in the current Skill runtime.**
+**The GPT Image 2.5 API contract supports the canonical custom size, but exact custom-size delivery by the current Skill runtime remains unverified.**
 
-For this repository, `1536 × 2048` remains the canonical local composition size, not a guaranteed image-generation output size.
+No Phase 1 implementation decision should rely on the invalidated probes.
