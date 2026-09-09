@@ -1,6 +1,6 @@
 # Phase 6 — Model and Quality Runtime Policy
 
-Status: **COMPLETED / NO MODEL-QUALITY CONTROLS EXPOSED**
+Status: **IN PROGRESS / C0 COMPLETE / C1 REFERENCE-ISOLATION NEXT**
 
 Date: 2026-09-10
 
@@ -62,23 +62,64 @@ referenced_image_paths: array<string> | null
 
 The callable declaration did not expose defaults for these controls except that `prompt` is required; Work guidance reported a maximum of 5 for `num_last_images_to_include`.
 
-## Production policy
+## C1 — Explicit reference-isolation call
 
-The accepted production call boundary is now explicit:
+C1 validates the only newly discovered production-relevant control before adoption.
+
+Use a fresh Work conversation with the isolated C1 Skill package and the real HUAWEI `黑.png` source.
+
+The complete `黑.png` remains a recent conversation image and is used locally only to build the deterministic palette reference.
+
+C1 then performs exactly one Image Gen call with:
 
 ```text
-prompt = deterministic scene prompt
+prompt = exact C1 empty-background prompt
+num_last_images_to_include = 0
+referenced_image_paths = [deterministic palette-reference.png]
+```
+
+The complete `黑.png` must not appear in `referenced_image_paths`.
+
+### C1 acceptance
+
+C1 passes when:
+
+1. the callable Image Gen operation accepts `num_last_images_to_include=0`,
+2. the callable operation accepts the explicit local palette path in `referenced_image_paths`,
+3. exactly one image-model operation occurs,
+4. no fallback or retry occurs,
+5. the returned image is an empty background rather than an obvious copied HUAWEI WATCH product scene.
+
+Visual inspection is supporting evidence only; callable argument acceptance is the primary gate.
+
+If the call rejects the explicit controls, stop without retry and report:
+
+```text
+REFERENCE_ISOLATION_CALL_REJECTED
+```
+
+If the call succeeds, report:
+
+```text
+REFERENCE_ISOLATION_CALL_ACCEPTED
+```
+
+## Production decision after C1
+
+If C1 passes, production Image Gen calls should explicitly use:
+
+```text
 num_last_images_to_include = 0
 referenced_image_paths = exact explicit authority list
 ```
 
-MASTER references:
+MASTER:
 
 ```text
 [palette-reference.png]
 ```
 
-SKU references:
+SKU:
 
 ```text
 [ORIGINAL_MASTER_BACKGROUND.png, current-SKU-palette-reference.png]
@@ -86,12 +127,12 @@ SKU references:
 
 The complete product/SKU artwork remains local and must not be sent to Image Gen.
 
-This prevents recent conversation images from being implicitly added to the model context and strengthens the Phase 3 palette-only isolation contract.
+If C1 fails, do not assume that zero recent-image inclusion can be enforced by the Skill; retain the current explicit reference-role instructions and record the runtime limitation.
 
-## Decision
+## Model / quality decision
 
 Do not write public API model names or unsupported quality/size/background/output-format/action controls into `SKILL.md`.
 
 Do not run model/quality A/B tests until the Work Skill runtime actually exposes such controls.
 
-Phase 6 is complete. Detailed evidence is in `docs/phase-6/RESULTS.md`.
+Detailed C0 evidence is in `docs/phase-6/RESULTS.md`.
