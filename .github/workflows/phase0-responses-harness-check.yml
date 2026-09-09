@@ -1,0 +1,54 @@
+name: Phase 0 Responses image harness check
+
+on:
+  push:
+    branches:
+      - images-2.5-roadmap
+    paths:
+      - scripts/phase0_responses_image_harness.py
+      - docs/phase-0/huawei-watch-fit-5-pro/master-prompt-black.txt
+      - .github/workflows/phase0-responses-harness-check.yml
+
+permissions:
+  contents: read
+
+jobs:
+  validate-harness:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile harness
+        run: python -m py_compile scripts/phase0_responses_image_harness.py
+
+      - name: Validate frozen prompt and dry-run request
+        run: |
+          python scripts/phase0_responses_image_harness.py \
+            --prompt docs/phase-0/huawei-watch-fit-5-pro/master-prompt-black.txt \
+            --reference-image docs/phase-0/fixtures/light-product-master.png \
+            --output /tmp/phase0-output.png \
+            --metadata /tmp/phase0-metadata.json \
+            --expected-prompt-sha256 12148360c40fe556ee8304c68a3914aa69e380d9fd75863b29809eac6a01a773 \
+            --dry-run | tee /tmp/dry-run.json
+          grep -q 'DRY_RUN_VALIDATED' /tmp/dry-run.json
+
+      - name: Verify missing-key fails before any API call
+        env:
+          OPENAI_API_KEY: ''
+        run: |
+          set +e
+          output=$(python scripts/phase0_responses_image_harness.py \
+            --prompt docs/phase-0/huawei-watch-fit-5-pro/master-prompt-black.txt \
+            --reference-image docs/phase-0/fixtures/light-product-master.png \
+            --output /tmp/phase0-output.png \
+            --metadata /tmp/phase0-metadata.json 2>&1)
+          status=$?
+          set -e
+          test "$status" -ne 0
+          echo "$output" | grep -q 'OPENAI_API_KEY_UNAVAILABLE'
