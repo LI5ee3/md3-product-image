@@ -1,5 +1,5 @@
 ---
-name: md3-product-image
+name: md3-product-image-phase6-c0
 description: "Phase 6 C0 runtime-control probe for md3-product-image. Inspect the real Work Image Gen callable interface and report only explicitly exposed production controls. This probe must not perform any image-model operation."
 ---
 
