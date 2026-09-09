@@ -1,0 +1,15 @@
+DELIVERABLE
+Create one portrait 3:4 empty Google Material Design 3 Classic e-commerce background plate.
+
+REFERENCE ROLE
+PALETTE_REFERENCE is authoritative for color relationships only.
+Do not reproduce, redraw, trace, imitate, or infer any product, product silhouette, hardware geometry, screen contents, strap shape, packaging, labels, icons, text, branding, or recognizable object details.
+
+VISUAL SYSTEM
+Use a clean Classic MD3 neumorphic soft-UI background with smooth rounded forms, broad calm areas, soft elevation, diffused highlights, restrained shadows, and a light macaron palette derived from PALETTE_REFERENCE.
+
+EXCLUSIONS
+No product, product shadow, Logo, brand mark, text, label, icon, watermark, packaging, floor, table, display stand, realistic environment, or unrelated object.
+
+OUTPUT CONTRACT
+Return exactly one empty 3:4 background plate suitable for later deterministic local composition.
