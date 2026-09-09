@@ -1,8 +1,8 @@
 # Phase 6 — Model and Quality Runtime Policy
 
-Status: **IN PROGRESS / C0 CAPABILITY ENUMERATION NEXT**
+Status: **IN PROGRESS / C0 R2 FRESH-SESSION PROBE NEXT**
 
-Date: 2026-09-09
+Date: 2026-09-10
 
 ## Objective
 
@@ -17,6 +17,41 @@ No production model, quality, size, output-format, or background-mode setting ch
 C0 performs **zero image-model operations**.
 
 Its only purpose is to inspect the callable Image Gen interface available to the installed Skill and report the controls that are explicitly exposed.
+
+### C0 attempt-1 transport finding
+
+The first Work attempts were **not valid runtime-control evidence**.
+
+The Work conversation had previously loaded the Phase 4 C0 probe under the production-like `md3-product-image` Skill identity. Even after installing a Phase 6 package with a changed internal name, the same Work conversation continued resolving the callable Skill state to the older Phase 4 instructions.
+
+Observed response referenced:
+
+```text
+md3-product-image
+Phase 4 C0 Edit Probe
+```
+
+instead of the Phase 6 instructions.
+
+Therefore:
+
+- this result is not `IMAGE_RUNTIME_CONTROL_SCHEMA_UNAVAILABLE`,
+- it says nothing about the actual Image Gen control schema,
+- no image-model operation was performed,
+- C0 must be rerun in a **fresh Work conversation** with only the isolated Phase 6 probe loaded.
+
+The isolated rerun package uses:
+
+```text
+name: phase6-runtime-control-probe-r2
+PROBE_PACKAGE_ID: PHASE6-C0-R2-20260910
+```
+
+If the active Skill does not expose both identifiers, the probe must stop with:
+
+```text
+PHASE6_C0_WRONG_SKILL_INSTANCE
+```
 
 ### Controls of interest
 
