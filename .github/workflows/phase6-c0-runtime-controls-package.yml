@@ -1,0 +1,36 @@
+name: Phase 6 C0 runtime control probe
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - images-2.5-roadmap
+    paths:
+      - 'docs/phase-6/PLAN.md'
+      - 'docs/phase-6/WORK_TEST_SKILL_C0.md'
+      - 'docs/phase-6/openai-c0.yaml'
+      - '.github/workflows/phase6-c0-runtime-controls-package.yml'
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build C0 Work test package
+        run: |
+          set -euo pipefail
+          mkdir -p package/agents
+          cp docs/phase-6/WORK_TEST_SKILL_C0.md package/SKILL.md
+          cp docs/phase-6/openai-c0.yaml package/agents/openai.yaml
+          (cd package && zip -r ../md3-product-image-phase6-c0-runtime-controls.zip .)
+          unzip -l md3-product-image-phase6-c0-runtime-controls.zip
+
+      - name: Upload C0 Work test Skill ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: md3-product-image-phase6-c0-runtime-controls
+          path: md3-product-image-phase6-c0-runtime-controls.zip
+          if-no-files-found: error
+          retention-days: 30
