@@ -1,15 +1,36 @@
 ---
-name: md3-product-image-phase6-c0
-description: "Phase 6 C0 runtime-control probe for md3-product-image. Inspect the real Work Image Gen callable interface and report only explicitly exposed production controls. This probe must not perform any image-model operation."
+name: phase6-runtime-control-probe-r2
+description: "Isolated Phase 6 C0 runtime-control probe for md3-product-image. Inspect the real Work Image Gen callable interface and report only explicitly exposed production controls. This probe must not perform any image-model operation."
 ---
 
-# MD3 Product Image — Phase 6 C0 Runtime Control Probe
+# MD3 Product Image — Phase 6 C0 Runtime Control Probe R2
+
+PROBE_PACKAGE_ID: `PHASE6-C0-R2-20260910`
 
 This package is only for Phase 6 C0 capability enumeration.
 
 It must perform **zero image-model operations**.
 
 Do not create, replace, redo, or renumber MASTER or SKU outputs.
+
+## Mandatory package identity check
+
+Before doing anything else, confirm that the currently executing Skill has:
+
+```text
+name: phase6-runtime-control-probe-r2
+PROBE_PACKAGE_ID: PHASE6-C0-R2-20260910
+```
+
+If either value is not present in the active Skill instructions, return:
+
+```text
+PHASE6_C0_WRONG_SKILL_INSTANCE
+```
+
+and stop.
+
+Do not inspect or execute any other `md3-product-image` Skill instance.
 
 ## Objective
 
@@ -77,7 +98,8 @@ Return one JSON object in this shape:
 
 ```json
 {
-  "probe": "phase6-c0-runtime-controls",
+  "probe": "phase6-c0-runtime-controls-r2",
+  "probe_package_id": "PHASE6-C0-R2-20260910",
   "image_model_operations": 0,
   "controls": [
     {
@@ -117,6 +139,7 @@ IMAGE_RUNTIME_CONTROL_SCHEMA_UNAVAILABLE
 - Do not infer public API parity.
 - Do not modify production files.
 - Do not change `SKILL.md` production behavior.
+- Do not fall back to a Skill named `md3-product-image`.
 
 ## Stop after C0
 
