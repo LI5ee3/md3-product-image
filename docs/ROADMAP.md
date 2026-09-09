@@ -23,8 +23,8 @@ The upgrade is an evolution of the current workflow, not a rewrite.
 | Phase 4 — Constrained SKU image edit | **COMPLETED / NOT ADOPTED** | Work exposes no verifiable edit operation; Phase 3 SKU regeneration remains authoritative |
 | Phase 5 — Optional layout guide | **SKIPPED / NOT NEEDED** | Accepted Work results kept the numeric safe zone clean; no guide ablation is justified |
 | Phase 6 — Runtime/model/quality policy | **COMPLETED** | Runtime schema enumerated; explicit reference-path mode adopted; model/quality controls are not exposed |
-| Phase 7 — Consolidated regression suite | **NEXT** | Merge deterministic and visual evidence and run final production smoke tests |
-| Phase 8 — Public contract / README / release | **PLANNED** | Only after Phase 7 passes |
+| Phase 7 — Consolidated regression suite | **COMPLETED** | Unified deterministic gate and final MASTER → orange SKU → white SKU Work smoke all passed |
+| Phase 8 — Public contract / README / release | **NEXT** | Reconcile public docs, validate release package, and prepare the next release |
 
 ---
 
@@ -164,7 +164,7 @@ Production therefore retains the Phase 3 SKU regeneration path.
 
 **Status: SKIPPED / NOT NEEDED**
 
-The conditional gate for `layout-guide.png` was not met. Accepted Phase 2 and Phase 3 MASTER/SKU Work results kept the information safe zone clean without an auxiliary layout image.
+The conditional gate for `layout-guide.png` was not met. Accepted Phase 2, Phase 3, and final Phase 7 Work results kept the information safe zone clean without an auxiliary layout image.
 
 Adding another model reference would increase complexity without evidence of a current failure. Reopen Phase 5 only if a future production regression shows numeric safe-zone instructions are insufficient.
 
@@ -211,48 +211,25 @@ C2 returned an accessible `1086 × 1448` RGBA background with SHA-256:
 d9f5b6fa0389b4a3475352c79509a09ac35e80e725fe5caba7344f697e4a99b9
 ```
 
-The production `SKILL.md` now requires explicit `referenced_image_paths`, omits `num_last_images_to_include`, and forbids inferring unsupported public-API controls.
+The production `SKILL.md` requires explicit `referenced_image_paths`, omits `num_last_images_to_include`, and forbids inferring unsupported public-API controls.
 
 ---
 
 # Phase 7 — Consolidated regression suite
 
-**Status: NEXT**
+**Status: COMPLETED / PASS**
 
-## Deterministic coverage
+## Consolidated deterministic gate
 
-Consolidate tests for:
+GitHub Actions workflow `Phase 7 consolidated regression`, run `34379183114`, passed all steps:
 
-- product-directory identity
-- source hashes
-- layout reuse
-- logical 3:4 layout contract
-- actual MASTER raster persistence
-- SKU/master raster equality
-- palette extraction determinism
-- palette cache identity/tamper detection
-- safe-zone calculation
-- prompt assembly order
-- prompt hashing
-- master binding
-- SKU labels
-- SKU redo atomic replacement
-- failed redo preserving old final
-- reusable asset identity
-- explicit Image Gen reference-path contract
-- unsupported runtime-control exclusions
-
-## Visual evidence matrix
-
-Preserve scored Work evidence for:
-
-- background quality
-- Classic MD3 adherence
-- palette harmony
-- safe-zone cleanliness
-- unwanted product copying
-- SKU composition drift
-- accidental generated text / Logo / objects
+- original workflow regression
+- raster contract regression
+- raster production integration regression
+- structured prompt regression
+- palette extraction regression
+- palette cache regression
+- Work runtime reference contract regression
 
 ## Required ablations status
 
@@ -262,23 +239,60 @@ Preserve scored Work evidence for:
 4. numeric safe zone vs optional layout guide — **SKIPPED / NOT NEEDED**
 5. model/quality configurations — **DONE / NOT APPLICABLE: controls not exposed**
 
-Phase 7 should end with a production-like MASTER → lock → orange SKU → white SKU smoke run using the final accepted Skill package.
+## Final production-like Work smoke
+
+The final accepted production candidate was tested in a fresh Work conversation using the authoritative HUAWEI source set:
+
+```text
+black MASTER
+→ explicit user lock
+→ orange SKU_VARIANT-A
+→ white SKU_VARIANT-B
+```
+
+All three outputs were `1086 × 1448` RGBA with fully opaque alpha and passed visual review.
+
+Final hashes:
+
+```text
+MASTER black
+5b2d32959cb1aa50c0d754058858f3292c8844091621b1021244a3ac1d90df58
+
+SKU_VARIANT-A orange
+76d1eb8540e3d8fba3a7ca5da024ce3c511c014c75fc1d8cea7578021086ba66
+
+SKU_VARIANT-B white
+658b65dadfefd8adef6ee3671cf2a064ca3d184c01207e953f11bf7552bfa9ec
+```
+
+Observed final behavior:
+
+- structured prompt: PASS
+- palette-only references: PASS
+- safe-zone cleanliness: PASS
+- MASTER/SKU raster equality: PASS
+- SKU composition consistency: PASS
+- accidental generated product/text/Logo contamination: none observed
+- user-controlled MASTER lock flow: PASS
+
+Detailed evidence is in `docs/phase-7/RESULTS.md`.
 
 ---
 
 # Phase 8 — Public Skill contract, README, and release
 
-**Status: PLANNED**
+**Status: NEXT**
 
 Only accepted, tested behavior is documented as production behavior.
 
-Expected final work:
+Required final work:
 
 - reconcile `SKILL.md` and `README.md`
-- remove test-only packaging from release artifacts
-- keep accepted production scripts and references only
-- run final package validation
-- cut the next release only after Phase 7 passes
+- remove test-only packaging and probe files from release artifacts
+- keep only accepted production scripts, references, assets, and required metadata
+- validate the final release ZIP from a clean package build
+- verify public documentation matches the implemented runtime/reference/raster contracts
+- prepare the next release only after final package validation passes
 
 ---
 
@@ -324,26 +338,18 @@ Phase 6  Runtime capability / reference-path contract   DONE
    ↓
 Phase 5  Optional layout-guide ablation                 SKIPPED / NOT NEEDED
    ↓
-Phase 7  Consolidated regression suite                  NEXT
+Phase 7  Consolidated regression + production smoke     DONE
    ↓
-Phase 8  Final Skill / README / release
+Phase 8  Final Skill / README / release                 NEXT
 ```
 
 ---
 
 # Definition of done
 
-The Images 2.5 upgrade is complete only when:
+The Images 2.5 behavior upgrade has passed its implementation and production-smoke gates. The project is release-ready only when Phase 8 also completes:
 
-- the structured palette-only prompt remains the validated default,
-- logical layout and actual delivery raster semantics are correct and documented,
-- locked MASTER raster is enforced across SKUs,
-- palette-only reference is used through the deterministic cache contract,
-- the Phase 3 SKU regeneration fallback remains authoritative while edit semantics are unavailable,
-- explicit `referenced_image_paths` is the validated callable reference contract,
-- unsupported Work runtime controls are not invented from API documentation,
-- no deterministic product/Logo/text/shadow responsibility moves into the image model,
-- prompt generation remains reproducible and recorded,
-- consolidated regression tests pass,
-- a final production-like Work smoke run passes,
-- `SKILL.md` and `README.md` describe implemented behavior rather than planned behavior.
+- `SKILL.md` and `README.md` describe only implemented behavior,
+- the release artifact excludes test-only probes and CI-only packaging,
+- the final clean package validation passes,
+- the release notes accurately summarize the accepted behavior changes.
