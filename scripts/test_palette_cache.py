@@ -13,7 +13,9 @@ from PIL import Image, ImageDraw
 
 
 ROOT = Path(__file__).resolve().parent.parent
-CACHE = ROOT / "scripts" / "palette_cache.py"
+SCRIPTS = ROOT / "scripts"
+CACHE = SCRIPTS / "palette_cache.py"
+EXTRACTOR = SCRIPTS / "extract_palette.py"
 
 
 def run_cache(source: Path, product_dir: Path, role: str, *, expect_ok: bool = True):
@@ -64,11 +66,32 @@ def main() -> None:
         assert master_json == reusable / "palette.json"
         assert master_reference == reusable / "palette-reference.png"
         assert master_json.is_file() and master_reference.is_file()
+        master_payload = json.loads(master_json.read_text(encoding="utf-8"))
+        assert master_payload["reference_sha256"] == first_master["palette_reference_sha256"]
 
-        second_master = run_cache(source, product_dir, "MASTER")
+        # Simulate a pre-A4 cache. The first legacy hit must verify the old cache
+        # deterministically, then record the reference hash once for future fast hits.
+        legacy_payload = dict(master_payload)
+        legacy_payload.pop("reference_sha256")
+        master_json.write_text(
+            json.dumps(legacy_payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        migrated_master = run_cache(source, product_dir, "MASTER")
+        assert migrated_master["created"] is False
+        migrated_payload = json.loads(master_json.read_text(encoding="utf-8"))
+        assert migrated_payload["reference_sha256"] == migrated_master["palette_reference_sha256"]
+
+        # A normal cache hit must no longer execute extract_palette.py.
+        disabled_extractor = EXTRACTOR.with_suffix(".py.disabled")
+        EXTRACTOR.rename(disabled_extractor)
+        try:
+            second_master = run_cache(source, product_dir, "MASTER")
+        finally:
+            disabled_extractor.rename(EXTRACTOR)
         assert second_master["created"] is False
-        assert second_master["palette_json_sha256"] == first_master["palette_json_sha256"]
-        assert second_master["palette_reference_sha256"] == first_master["palette_reference_sha256"]
+        assert second_master["palette_json_sha256"] == migrated_master["palette_json_sha256"]
+        assert second_master["palette_reference_sha256"] == migrated_master["palette_reference_sha256"]
 
         first_sku = run_cache(source, product_dir, "SKU")
         assert first_sku["created"] is True
@@ -76,7 +99,12 @@ def main() -> None:
         assert Path(first_sku["palette_json"]) == reusable / "palettes" / f"{source_sha}.json"
         assert Path(first_sku["palette_reference"]) == reusable / "palettes" / f"{source_sha}.png"
 
-        second_sku = run_cache(source, product_dir, "SKU")
+        disabled_extractor = EXTRACTOR.with_suffix(".py.disabled")
+        EXTRACTOR.rename(disabled_extractor)
+        try:
+            second_sku = run_cache(source, product_dir, "SKU")
+        finally:
+            disabled_extractor.rename(EXTRACTOR)
         assert second_sku["created"] is False
         assert second_sku["palette_reference_sha256"] == first_sku["palette_reference_sha256"]
 

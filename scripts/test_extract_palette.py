@@ -77,6 +77,7 @@ def main() -> None:
         assert payload_a["policy"]["requested_colors"] == 7
         assert 1 <= len(payload_a["colors"]) <= 7
         assert all(color["hex"].startswith("#") for color in payload_a["colors"])
+        assert payload_a["reference_sha256"] == sha256(ref_a)
 
         with Image.open(ref_a) as reference:
             assert reference.size == (1024, 256)
@@ -91,6 +92,7 @@ def main() -> None:
         # the visible palette selection or the color-only reference pixels.
         assert payload_variant["source_sha256"] != payload_a["source_sha256"]
         assert payload_variant["colors"] == payload_a["colors"]
+        assert payload_variant["reference_sha256"] == payload_a["reference_sha256"]
         assert sha256(variant_ref) == sha256(ref_a)
 
         error = run(
