@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parent.parent
-ACTIVE = ROOT / "references" / "image-gen-prompt.txt"
+ACTIVE = ROOT / "references" / "image-gen-prompt.md"
 BASELINE = ROOT / "references" / "image-gen-prompt-v2-baseline.txt"
 
 
@@ -29,8 +29,9 @@ def main() -> None:
 
     positions = []
     for heading in headings:
-        assert lines.count(heading) == 1, heading
-        positions.append(lines.index(heading))
+        markdown_heading = f"## {heading}"
+        assert lines.count(markdown_heading) == 1, heading
+        positions.append(lines.index(markdown_heading))
     assert positions == sorted(positions)
 
     assert "PALETTE_REFERENCE: authoritative color-only palette reference." in active

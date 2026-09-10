@@ -105,13 +105,13 @@ For an SKU:
 python scripts/scene_prompt.py build --mode SKU --layout <reusable/layout.json> --master <reusable/master.json>
 ```
 
-`scene_prompt.py build` writes the complete Image Gen prompt to stdout. Capture that successful stdout and pass it verbatim to Image Gen in the same tool flow. Never infer, reconstruct, search for, or read a `scene-prompt-*.txt` filename; those files are records only. Stop before Image Gen if the command fails or stdout is empty.
+`scene_prompt.py build` writes the complete Image Gen prompt to stdout. Capture that successful stdout and pass it verbatim to Image Gen in the same tool flow. Never infer, reconstruct, search for, or read a `scene-prompt-*.md` filename; those files are records only. Stop before Image Gen if the command fails or stdout is empty.
 
-The active master background prompt in `references/image-gen-prompt.txt` is the validated structured palette-only prompt. The v2.0 prose prompt is retained only at `references/image-gen-prompt-v2-baseline.txt` for regression, ablation, and fallback comparison; do not use it by default.
+The active master background prompt in `references/image-gen-prompt.md` is the validated structured palette-only prompt. The v2.0 prose prompt is retained only at `references/image-gen-prompt-v2-baseline.txt` for regression, ablation, and fallback comparison; do not use it by default.
 
 The prompt order is:
 
-1. current `references/image-gen-prompt.txt`
+1. current `references/image-gen-prompt.md`
 2. `references/replace-variant-block.md` for SKU only
 3. merged information safe-zone block
 4. every user-supplied accumulated addition from `reusable/prompt-additions.json`

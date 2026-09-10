@@ -12,7 +12,7 @@ from common import atomic_write, read_json, verify_information_assets, verify_ma
 
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
-IMAGE_PROMPT_REFERENCE = SKILL_DIR / "references" / "image-gen-prompt.txt"
+IMAGE_PROMPT_REFERENCE = SKILL_DIR / "references" / "image-gen-prompt.md"
 VARIANT_REFERENCE = SKILL_DIR / "references" / "replace-variant-block.md"
 ATTEMPT_STATE_NAME = "scene-attempts.json"
 PROMPT_ADDITIONS_NAME = "prompt-additions.json"
@@ -201,7 +201,7 @@ def prompt_file_path(
     target_hash = hashlib.sha256(target.encode("utf-8")).hexdigest()[:10]
     return product_dir / (
         f"scene-prompt-{mode.lower()}-{target_hash}-"
-        f"run-{run['run_id'].rsplit('-', 1)[-1]}-attempt-{attempt}.txt"
+        f"run-{run['run_id'].rsplit('-', 1)[-1]}-attempt-{attempt}.md"
     )
 
 
