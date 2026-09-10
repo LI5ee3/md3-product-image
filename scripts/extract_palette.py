@@ -297,6 +297,7 @@ def main() -> None:
         }
 
         render_reference(selected, reference_output)
+        payload["reference_sha256"] = sha256_file(reference_output)
         json_output.parent.mkdir(parents=True, exist_ok=True)
         json_output.write_text(
             json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
@@ -308,7 +309,7 @@ def main() -> None:
             "reference_output": str(reference_output),
             "source_sha256": payload["source_sha256"],
             "palette_sha256": sha256_file(json_output),
-            "reference_sha256": sha256_file(reference_output),
+            "reference_sha256": payload["reference_sha256"],
             "color_count": len(palette_colors),
             "colors": palette_colors,
         }

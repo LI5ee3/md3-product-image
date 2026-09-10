@@ -11,11 +11,12 @@ import sys
 import tempfile
 from pathlib import Path
 
-from common import read_json, sha256_file
+from common import atomic_write, read_json, sha256_file
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 EXTRACTOR = SCRIPTS_DIR / "extract_palette.py"
+REFERENCE_HASH_FIELD = "reference_sha256"
 
 
 def run_extractor(source: Path, json_output: Path, reference_output: Path) -> None:
@@ -47,6 +48,32 @@ def output_paths(product_dir: Path, role: str, source_sha: str) -> tuple[Path, P
     return palette_dir / f"{source_sha}.json", palette_dir / f"{source_sha}.png"
 
 
+def migrate_legacy_cache(
+    source: Path,
+    json_path: Path,
+    reference_path: Path,
+    payload: dict,
+) -> None:
+    with tempfile.TemporaryDirectory(prefix="md3-palette-legacy-verify-") as temporary:
+        root = Path(temporary)
+        expected_json = root / "palette.json"
+        expected_reference = root / "palette-reference.png"
+        run_extractor(source, expected_json, expected_reference)
+        expected_payload = read_json(expected_json)
+        expected_reference_sha = expected_payload.pop(REFERENCE_HASH_FIELD, None)
+        if expected_payload != payload:
+            raise ValueError("PALETTE_JSON_HASH_MISMATCH")
+        if (
+            not isinstance(expected_reference_sha, str)
+            or expected_reference_sha != sha256_file(reference_path)
+        ):
+            raise ValueError("PALETTE_REFERENCE_HASH_MISMATCH")
+
+    payload = dict(payload)
+    payload[REFERENCE_HASH_FIELD] = expected_reference_sha
+    atomic_write(json_path, payload)
+
+
 def verify_existing(source: Path, json_path: Path, reference_path: Path) -> None:
     if json_path.exists() != reference_path.exists():
         raise ValueError("PALETTE_CACHE_INCOMPLETE")
@@ -58,15 +85,15 @@ def verify_existing(source: Path, json_path: Path, reference_path: Path) -> None
     if payload.get("source_sha256") != source_sha:
         raise ValueError("PALETTE_SOURCE_MISMATCH")
 
-    with tempfile.TemporaryDirectory(prefix="md3-palette-verify-") as temporary:
-        root = Path(temporary)
-        expected_json = root / "palette.json"
-        expected_reference = root / "palette-reference.png"
-        run_extractor(source, expected_json, expected_reference)
-        if sha256_file(expected_json) != sha256_file(json_path):
-            raise ValueError("PALETTE_JSON_HASH_MISMATCH")
-        if sha256_file(expected_reference) != sha256_file(reference_path):
-            raise ValueError("PALETTE_REFERENCE_HASH_MISMATCH")
+    expected_reference_sha = payload.get(REFERENCE_HASH_FIELD)
+    if expected_reference_sha is None:
+        migrate_legacy_cache(source, json_path, reference_path, payload)
+        return
+    if (
+        not isinstance(expected_reference_sha, str)
+        or expected_reference_sha != sha256_file(reference_path)
+    ):
+        raise ValueError("PALETTE_REFERENCE_HASH_MISMATCH")
 
 
 def main() -> None:
@@ -100,8 +127,11 @@ def main() -> None:
                 temporary_json = root / "palette.json"
                 temporary_reference = root / "palette-reference.png"
                 run_extractor(source, temporary_json, temporary_reference)
-                if read_json(temporary_json).get("source_sha256") != source_sha:
+                payload = read_json(temporary_json)
+                if payload.get("source_sha256") != source_sha:
                     raise ValueError("PALETTE_SOURCE_MISMATCH")
+                if payload.get(REFERENCE_HASH_FIELD) != sha256_file(temporary_reference):
+                    raise ValueError("PALETTE_REFERENCE_HASH_MISMATCH")
                 shutil.copy2(temporary_json, json_path)
                 shutil.copy2(temporary_reference, reference_path)
             created = True
