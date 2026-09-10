@@ -1,4 +1,4 @@
-name: One-time Rubik roadmap migration
+name: One-time Rubik roadmap cleanup
 
 on:
   push:
@@ -11,202 +11,22 @@ permissions:
   contents: write
 
 jobs:
-  migrate:
+  cleanup:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Download and verify Rubik Variable
-        shell: bash
-        run: |
-          set -euo pipefail
-          curl -L --fail --retry 3 \
-            -o 'assets/Rubik[wght].ttf' \
-            'https://raw.githubusercontent.com/google/fonts/main/ofl/rubik/Rubik%5Bwght%5D.ttf'
-          curl -L --fail --retry 3 \
-            -o assets/OFL.txt \
-            'https://raw.githubusercontent.com/google/fonts/main/ofl/rubik/OFL.txt'
-          python - <<'PY'
-          import hashlib
-          from pathlib import Path
-
-          path = Path('assets/Rubik[wght].ttf')
-          data = path.read_bytes()
-          blob_sha = hashlib.sha1(f'blob {len(data)}\0'.encode() + data).hexdigest()
-          expected = 'a59aeb632df494345a542697c357f608875481b0'
-          if blob_sha != expected:
-              raise SystemExit(f'Rubik blob mismatch: {blob_sha} != {expected}')
-          print(f'Rubik verified: {len(data)} bytes, git blob {blob_sha}')
-          PY
-
-      - name: Patch active font contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          python - <<'PY'
-          from pathlib import Path
-
-          def replace_exact(path: str, old: str, new: str, expected: int = 1) -> None:
-              p = Path(path)
-              text = p.read_text(encoding='utf-8')
-              count = text.count(old)
-              if count != expected:
-                  raise SystemExit(f'{path}: expected {expected} matches, found {count}: {old!r}')
-              p.write_text(text.replace(old, new), encoding='utf-8')
-
-          replace_exact(
-              'README.md',
-              'Image Gen 只负责生成空背景；产品、固定 50° 二维投影、源 Logo、Roboto Bold 标题/版本文字以及最终合成都由本地确定性脚本完成。',
-              'Image Gen 只负责生成空背景；产品、固定 50° 二维投影、源 Logo、Rubik Variable（默认字重 700）标题/版本文字以及最终合成都由本地确定性脚本完成。',
-          )
-          replace_exact(
-              'README.md',
-              '- Roboto Bold 字体渲染',
-              '- Rubik Variable 字体渲染（默认字重 700）',
-          )
-
-          replace_exact(
-              'SKILL.md',
-              'Use only proportional Logo scaling and Roboto Bold text.',
-              'Use only proportional Logo scaling and Rubik Variable text. Use weight 700 by default; change the weight only when the user explicitly requests it.',
-          )
-          replace_exact(
-              'SKILL.md',
-              'Always use bundled `assets/Roboto-Bold.ttf`.',
-              'Always use bundled `assets/Rubik[wght].ttf` with `--font-weight 700`.',
-          )
-          replace_exact(
-              'SKILL.md',
-              'Roboto Bold text',
-              'Rubik Variable text',
-          )
-
-          replace_exact(
-              'scripts/measure_text.py',
-              'FONT_DEFAULT = Path(__file__).resolve().parent.parent / "assets" / "Roboto-Bold.ttf"',
-              'FONT_DEFAULT = Path(__file__).resolve().parent.parent / "assets" / "Rubik[wght].ttf"\nFONT_WEIGHT_DEFAULT = 700',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '''def mask_signature(font: ImageFont.FreeTypeFont, text: str) -> tuple:\n''',
-              '''def load_font(\n    font_path: Path, size: int, weight: int\n) -> ImageFont.FreeTypeFont:\n    font = ImageFont.truetype(str(font_path), size)\n    try:\n        axes = font.get_variation_axes()\n    except OSError:\n        axes = []\n    if axes:\n        if len(axes) != 1:\n            raise ValueError(\n                f"FONT_VARIATION_UNSUPPORTED: expected one axis, found {len(axes)}"\n            )\n        axis = axes[0]\n        minimum = int(axis["minimum"])\n        maximum = int(axis["maximum"])\n        if not minimum <= weight <= maximum:\n            raise ValueError(\n                f"FONT_WEIGHT_OUT_OF_RANGE: {weight} not in {minimum}..{maximum}"\n            )\n        font.set_variation_by_axes([weight])\n    return font\n\n\ndef mask_signature(font: ImageFont.FreeTypeFont, text: str) -> tuple:\n''',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '''def check_glyph_coverage(font_path: Path, *texts: str) -> None:\n    """Reject characters rendered as the font's missing-glyph box."""\n    font = ImageFont.truetype(str(font_path), 96)\n''',
-              '''def check_glyph_coverage(font_path: Path, weight: int, *texts: str) -> None:\n    """Reject characters rendered as the font's missing-glyph box."""\n    font = load_font(font_path, 96, weight)\n''',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '''def font_for_lines_height(\n    font_path: Path, lines: list[str], target_height: int\n) -> ImageFont.FreeTypeFont:\n    lo, hi = 1, max(16, target_height * 4)\n    candidates: list[tuple[int, int, ImageFont.FreeTypeFont]] = []\n    while lo <= hi:\n        size = (lo + hi) // 2\n        font = ImageFont.truetype(str(font_path), size)\n''',
-              '''def font_for_lines_height(\n    font_path: Path, lines: list[str], target_height: int, weight: int\n) -> ImageFont.FreeTypeFont:\n    lo, hi = 1, max(16, target_height * 4)\n    candidates: list[tuple[int, int, ImageFont.FreeTypeFont]] = []\n    while lo <= hi:\n        size = (lo + hi) // 2\n        font = load_font(font_path, size, weight)\n''',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '    font_path: Path = field(default_factory=lambda: FONT_DEFAULT)\n',
-              '    font_path: Path = field(default_factory=lambda: FONT_DEFAULT)\n    font_weight: int = FONT_WEIGHT_DEFAULT\n',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '    title_font = font_for_lines_height(opts.font_path, lines, target_height)\n',
-              '    title_font = font_for_lines_height(\n        opts.font_path, lines, target_height, opts.font_weight\n    )\n',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '    opts = LayoutOptions(font_path=Path(args.font_path))\n',
-              '    opts = LayoutOptions(\n        font_path=Path(args.font_path), font_weight=args.font_weight\n    )\n',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '''    check_glyph_coverage(\n        opts.font_path,\n        args.title_line_1,\n''',
-              '''    check_glyph_coverage(\n        opts.font_path,\n        opts.font_weight,\n        args.title_line_1,\n''',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '''            [args.version],\n            round(opts.version_height_frac * height),\n        )\n''',
-              '''            [args.version],\n            round(opts.version_height_frac * height),\n            opts.font_weight,\n        )\n''',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '        "font": {"path": str(opts.font_path), "name": "Roboto Bold"},\n',
-              '        "font": {\n            "path": str(opts.font_path),\n            "name": "Rubik Variable",\n            "weight": opts.font_weight,\n        },\n',
-          )
-          replace_exact(
-              'scripts/measure_text.py',
-              '    parser.add_argument("--font-path", default=str(FONT_DEFAULT))\n',
-              '    parser.add_argument("--font-path", default=str(FONT_DEFAULT))\n    parser.add_argument("--font-weight", type=int, default=FONT_WEIGHT_DEFAULT)\n',
-          )
-
-          replace_exact(
-              'scripts/test_workflow.py',
-              '            "--version", "Pro",\n',
-              '            "--version", "Глобальная версия",\n',
-          )
-          replace_exact(
-              'scripts/test_workflow.py',
-              '        assert report["title_lines"] == ["Pixel by", "Google"]\n',
-              '        assert report["title_lines"] == ["Pixel by", "Google"]\n        assert report["version"] == "Глобальная версия"\n        assert report["font"]["name"] == "Rubik Variable"\n        assert report["font"]["weight"] == 700\n',
-          )
-          PY
-
-      - name: Remove old Roboto asset
-        run: git rm assets/Roboto-Bold.ttf
-
-      - name: Install Pillow
-        run: python -m pip install --disable-pip-version-check pillow
-
-      - name: Compile all production and test scripts
-        run: |
-          python -m py_compile \
-            scripts/common.py \
-            scripts/measure_text.py \
-            scripts/scene_prompt.py \
-            scripts/compose_scene.py \
-            scripts/compose_image.py \
-            scripts/artifact_flow.py \
-            scripts/validate_raster.py \
-            scripts/extract_palette.py \
-            scripts/palette_cache.py \
-            scripts/test_workflow.py \
-            scripts/test_raster_contract.py \
-            scripts/test_raster_integration.py \
-            scripts/test_prompt_structure.py \
-            scripts/test_extract_palette.py \
-            scripts/test_palette_cache.py \
-            scripts/test_runtime_reference_contract.py
-
-      - name: Run consolidated regression suite
-        run: |
-          set -euo pipefail
-          python scripts/test_workflow.py
-          python scripts/test_raster_contract.py
-          python scripts/test_raster_integration.py
-          python scripts/test_prompt_structure.py
-          python scripts/test_extract_palette.py
-          python scripts/test_palette_cache.py
-          python scripts/test_runtime_reference_contract.py
-
-      - name: Verify active font contract
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f 'assets/Rubik[wght].ttf'
-          test ! -e assets/Roboto-Bold.ttf
-          if grep -RIn --exclude='*.pyc' 'Roboto' README.md SKILL.md scripts; then
-            echo 'Active Roboto reference remains' >&2
-            exit 1
-          fi
-          grep -q 'Copyright 2015 The Rubik Project Authors' assets/OFL.txt
-
-      - name: Commit migration
+      - name: Remove temporary branch and workflow
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add README.md SKILL.md scripts/measure_text.py scripts/test_workflow.py assets/OFL.txt 'assets/Rubik[wght].ttf'
-          git status --short
-          git commit -m 'feat: switch roadmap branch to Rubik Variable'
+          if git ls-remote --exit-code --heads origin __noop >/dev/null 2>&1; then
+            git push origin --delete __noop
+          fi
+          git rm .github/workflows/migrate-rubik-roadmap.yml
+          git commit -m 'chore: remove temporary Rubik migration workflow'
           git push
