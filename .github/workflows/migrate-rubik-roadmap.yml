@@ -67,18 +67,21 @@ jobs:
               '- Rubik Variable 字体渲染（默认字重 700）',
           )
 
-          p = Path('SKILL.md')
-          text = p.read_text(encoding='utf-8')
-          replacements = {
-              'Roboto Bold text': 'Rubik Variable text',
-              'Always use bundled `assets/Roboto-Bold.ttf`.': 'Always use bundled `assets/Rubik[wght].ttf` with `--font-weight 700`.',
-              'Use only proportional Logo scaling and Roboto Bold text.': 'Use only proportional Logo scaling and Rubik Variable text. Use weight 700 by default; change the weight only when the user explicitly requests it.',
-          }
-          for old, new in replacements.items():
-              if text.count(old) != 1:
-                  raise SystemExit(f'SKILL.md: expected one match for {old!r}, found {text.count(old)}')
-              text = text.replace(old, new)
-          p.write_text(text, encoding='utf-8')
+          replace_exact(
+              'SKILL.md',
+              'Use only proportional Logo scaling and Roboto Bold text.',
+              'Use only proportional Logo scaling and Rubik Variable text. Use weight 700 by default; change the weight only when the user explicitly requests it.',
+          )
+          replace_exact(
+              'SKILL.md',
+              'Always use bundled `assets/Roboto-Bold.ttf`.',
+              'Always use bundled `assets/Rubik[wght].ttf` with `--font-weight 700`.',
+          )
+          replace_exact(
+              'SKILL.md',
+              'Roboto Bold text',
+              'Rubik Variable text',
+          )
 
           replace_exact(
               'scripts/measure_text.py',
