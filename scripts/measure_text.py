@@ -429,11 +429,6 @@ def prepare_layout(args: argparse.Namespace) -> dict:
         "clear_zones": clear_zones(labeled_rects, width, height, opts),
     }
     atomic_write(layout_path, report, new=True)
-    atomic_write(
-        product_dir / "scene-attempts.json",
-        {"schema": 1, "next_run": 1, "active_run_id": None, "runs": []},
-        new=True,
-    )
     return report
 
 
