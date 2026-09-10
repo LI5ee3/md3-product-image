@@ -126,19 +126,6 @@ def verify_information_assets(layout: dict, reusable_dir: Path) -> None:
             raise ValueError(f"INFORMATION_ASSET_HASH_MISMATCH: {label}")
 
 
-def resolve_entry(entry: dict, product_dir: Path, expected: Path, label: str) -> Path:
-    try:
-        path = (product_dir / entry["path"]).resolve()
-        expected_hash = entry["sha256"]
-    except (KeyError, TypeError) as exc:
-        raise ValueError(f"MANIFEST_ENTRY_INVALID: {label}") from exc
-    if path != expected or not path.is_file():
-        raise ValueError(f"MANIFEST_PATH_MISMATCH: {label}")
-    if sha256_file(path) != expected_hash:
-        raise ValueError(f"MANIFEST_HASH_MISMATCH: {label}")
-    return path
-
-
 def verify_master(product_dir: Path) -> dict:
     reusable = product_dir / "reusable"
     manifest = read_json(reusable / "master.json")
@@ -151,8 +138,17 @@ def verify_master(product_dir: Path) -> dict:
         "shadow": reusable / "ORIGINAL_MASTER_SHADOW.png",
         "final": product_dir / "output" / "ORIGINAL_MASTER_FINAL.png",
     }
-    for label, path in expected.items():
-        resolve_entry(manifest["files"].get(label), product_dir, path, label)
+    for label, expected_path in expected.items():
+        entry = manifest["files"].get(label)
+        try:
+            path = (product_dir / entry["path"]).resolve()
+            expected_hash = entry["sha256"]
+        except (KeyError, TypeError) as exc:
+            raise ValueError(f"MANIFEST_ENTRY_INVALID: {label}") from exc
+        if path != expected_path or not path.is_file():
+            raise ValueError(f"MANIFEST_PATH_MISMATCH: {label}")
+        if sha256_file(path) != expected_hash:
+            raise ValueError(f"MANIFEST_HASH_MISMATCH: {label}")
 
     if manifest.get("raster") is None:
         raster = require_three_four_raster(expected["background"], "MASTER_BACKGROUND")

@@ -27,10 +27,8 @@ def must_fail(script: str, *args: str) -> str:
     return completed.stderr or completed.stdout
 
 
-def scene_prompt(layout: Path, mode: str, *, target: str = "", master: Path | None = None, redo: bool = False, addition: str = "", fail: bool = False) -> str:
+def scene_prompt(layout: Path, mode: str, *, master: Path | None = None, redo: bool = False, addition: str = "", fail: bool = False) -> str:
     args = ["build", "--layout", str(layout), "--mode", mode]
-    if target:
-        args += ["--target", target]
     if master:
         args += ["--master", str(master)]
     if redo:
@@ -83,14 +81,14 @@ def main() -> None:
         assert report["font"]["name"] == "Rubik Variable"
         assert report["font"]["weight"] == 700
 
-        prompt = scene_prompt(layout, "MASTER", target="01")
+        prompt = scene_prompt(layout, "MASTER")
         assert "FINAL_INFORMATION_SAFE_ZONE" in prompt
-        assert scene_prompt(layout, "MASTER", target="01") == prompt
+        assert scene_prompt(layout, "MASTER") == prompt
         assert not (product_dir / "scene-attempts.json").exists()
         assert not list(product_dir.glob("scene-prompt-*.md"))
 
         preview = json.loads(run("artifact_flow.py", "preview", "--generated-background", str(background), "--product", str(product), "--product-dir", str(product_dir), "--candidate-id", "01"))
-        assert preview["information"] == {"title_color": "2C2C2C", "version_color": "5A5A5A"}
+        assert "information" not in preview and "scene_composite" not in preview
         assert "scene_attempt" not in preview
         preview_manifest = json.loads((product_dir / "master-candidate-01-preview.json").read_text(encoding="utf-8"))
         assert "files" not in preview_manifest
@@ -101,10 +99,10 @@ def main() -> None:
         cached_hashes = (sha256(cached_product), sha256(cached_shadow))
         run("artifact_flow.py", "discard-preview", "--product-dir", str(product_dir), "--candidate-id", "01")
 
-        retry_prompt = scene_prompt(layout, "MASTER", target="01", redo=True, addition="Keep the left side quieter")
+        retry_prompt = scene_prompt(layout, "MASTER", redo=True, addition="Keep the left side quieter")
         assert retry_prompt.count("Keep the left side quieter") == 1
         for _ in range(3):
-            repeated_prompt = scene_prompt(layout, "MASTER", target="01", redo=True)
+            repeated_prompt = scene_prompt(layout, "MASTER", redo=True)
             assert repeated_prompt.count("Keep the left side quieter") == 1
 
         run("artifact_flow.py", "preview", "--generated-background", str(second_background), "--product", str(product), "--product-dir", str(product_dir), "--candidate-id", "01")
@@ -117,7 +115,9 @@ def main() -> None:
         run("artifact_flow.py", "bind", "--product-dir", str(product_dir), "--candidate-id", "01")
         master = reusable / "master.json"
         assert master.is_file()
-        assert "scene" not in json.loads(master.read_text(encoding="utf-8"))["files"]
+        master_payload = json.loads(master.read_text(encoding="utf-8"))
+        assert "scene" not in master_payload["files"]
+        assert "information" not in master_payload and "scene_composite" not in master_payload
         assert not list(product_dir.glob("*-scene.png"))
         assert not (reusable / "ORIGINAL_MASTER_SCENE.png").exists()
         assert {path.name for path in (product_dir / "output").iterdir()} == {"ORIGINAL_MASTER_FINAL.png"}
@@ -126,7 +126,8 @@ def main() -> None:
         assert "Keep the left side quieter" in sku_prompt
         sku_report = json.loads(run("artifact_flow.py", "sku", "--generated-background", str(background), "--product", str(sku_product), "--product-dir", str(product_dir)))
         assert sku_report["sku_label"] == "SKU_VARIANT-A"
-        assert sku_report["information"] == {"title_color": "2C2C2C", "version_color": "5A5A5A"}
+        assert "information" not in sku_report and "scene_composite" not in sku_report
+        assert "master_verified" not in sku_report
         assert "scene_attempt" not in sku_report
 
         sku_layers = (reusable / "SKU_VARIANT-A-product.png", reusable / "SKU_VARIANT-A-shadow.png")
@@ -135,7 +136,7 @@ def main() -> None:
         assert sku_final.is_file()
         original_sku_hash = sha256(sku_final)
 
-        sku_retry_prompt = scene_prompt(layout, "SKU", master=master, redo=True, target="SKU_VARIANT-A", addition="Use warmer accent cards")
+        sku_retry_prompt = scene_prompt(layout, "SKU", master=master, redo=True, addition="Use warmer accent cards")
         assert "Keep the left side quieter" in sku_retry_prompt
         assert "Use warmer accent cards" in sku_retry_prompt
         assert original_sku_hash == sha256(sku_final)

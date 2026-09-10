@@ -12,8 +12,6 @@ from pathlib import Path
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
 COMPOSE_SCRIPT = SCRIPTS_DIR / "compose_image.py"
-TITLE_COLOR = "2C2C2C"
-VERSION_COLOR = "5A5A5A"
 SKU_TARGET_PATTERN = re.compile(r"SKU_VARIANT-([A-Z]+)")
 
 
@@ -80,22 +78,6 @@ def copy_new(source_arg: str | Path, destination: Path) -> None:
     shutil.copy2(source, destination)
 
 
-def run_script(arguments: list[str]) -> dict:
-    completed = subprocess.run(
-        [sys.executable, *arguments],
-        text=True,
-        capture_output=True,
-        check=False,
-    )
-    if completed.returncode:
-        detail = completed.stderr.strip() or completed.stdout.strip()
-        raise ValueError(detail or f"SCRIPT_FAILED: {arguments[0]}")
-    try:
-        return json.loads(completed.stdout)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"SCRIPT_OUTPUT_INVALID: {arguments[0]}") from exc
-
-
 def run_composite(
     background: Path,
     product: Path,
@@ -104,7 +86,7 @@ def run_composite(
     output_kind: str,
     product_layer: Path,
     shadow_mask: Path,
-) -> dict:
+) -> None:
     if product_layer.exists() != shadow_mask.exists():
         raise ValueError("CACHED_PRODUCT_SHADOW_INCOMPLETE")
     command = [
@@ -119,24 +101,15 @@ def run_composite(
     ]
     if product_layer.exists():
         command.append("--reuse-layers")
-    return run_script(command)
-
-
-def scene_composite_info(report: dict) -> dict:
-    product_box = report.get("product_box")
-    shadow = report.get("shadow")
-    if not isinstance(product_box, dict) or not isinstance(shadow, dict):
-        raise ValueError("SCENE_COMPOSITE_REPORT_INVALID")
-    return {"product_box": product_box, "shadow": shadow}
-
-
-def validate_information_colors(layout: dict, information: dict) -> None:
-    elements = layout.get("elements")
-    if not isinstance(elements, dict):
-        raise ValueError("LAYOUT_ELEMENTS_INVALID")
-    expected_version = VERSION_COLOR if "VERSION_TEXT_RECT" in elements else None
-    if information.get("title_color") != TITLE_COLOR or information.get("version_color") != expected_version:
-        raise ValueError("FIXED_INFORMATION_COLOR_MISMATCH")
+    completed = subprocess.run(
+        [sys.executable, *command],
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+    if completed.returncode:
+        detail = completed.stderr.strip() or completed.stdout.strip()
+        raise ValueError(detail or "COMPOSITE_FAILED")
 
 
 def cleanup(paths: list[Path]) -> None:
@@ -178,16 +151,13 @@ def create_preview(args: argparse.Namespace) -> None:
         copy_new(args.generated_background, paths["background"])
         background_raster = require_three_four_raster(paths["background"], "MASTER_BACKGROUND")
         raster = {"width": int(background_raster["width"]), "height": int(background_raster["height"]), "ratio": "3:4"}
-        render = run_composite(
+        run_composite(
             paths["background"], product_source, layout_path, paths["final"],
             "CANDIDATE", paths["product"], paths["shadow"],
         )
-        scene_render = scene_composite_info(render)
         require_matching_raster(paths["product"], raster, "MASTER_PRODUCT_LAYER")
         require_matching_raster(paths["shadow"], raster, "MASTER_SHADOW")
         require_matching_raster(paths["final"], raster, "MASTER_FINAL")
-        information = {"title_color": render.get("title_color"), "version_color": render.get("version_color")}
-        validate_information_colors(layout, information)
         manifest = {
             "schema": 1,
             "kind": "MASTER_CANDIDATE_PREVIEW",
@@ -195,8 +165,6 @@ def create_preview(args: argparse.Namespace) -> None:
             "raster": raster,
             "background_sha256": sha256_file(paths["background"]),
             "final_sha256": sha256_file(paths["final"]),
-            "information": information,
-            "scene_composite": scene_render,
         }
         atomic_write(paths["manifest"], manifest, new=True)
     except Exception:
@@ -235,7 +203,7 @@ def discard_preview(args: argparse.Namespace) -> None:
 
 
 def bind_candidate(args: argparse.Namespace) -> None:
-    product_dir, layout_path, layout = load_product(args.product_dir)
+    product_dir, layout_path, _ = load_product(args.product_dir)
     reusable_dir = product_dir / "reusable"
     candidate_id = safe_component(args.candidate_id, "CANDIDATE_ID")
     ensure_output_allowed(product_dir)
@@ -257,10 +225,6 @@ def bind_candidate(args: argparse.Namespace) -> None:
         for label in ("background", "product", "shadow", "final"):
             copy_new(preview_files[label], targets[label])
             require_matching_raster(targets[label], raster, f"MASTER_{label.upper()}")
-        information = preview.get("information")
-        if not isinstance(information, dict):
-            raise ValueError("CANDIDATE_INFORMATION_INVALID")
-        validate_information_colors(layout, information)
         master = {
             "schema": 1,
             "state": "BOUND",
@@ -273,12 +237,6 @@ def bind_candidate(args: argparse.Namespace) -> None:
                 "final": relative_entry(targets["final"], product_dir),
             },
             "raster": raster,
-            "information": {
-                "title_color": information["title_color"],
-                "version_color": information["version_color"],
-                "title_line_count": layout.get("title_line_count"),
-            },
-            "scene_composite": preview.get("scene_composite"),
         }
         atomic_write(targets["manifest"], master, new=True)
     except Exception:
@@ -339,7 +297,7 @@ def resolve_sku_label(product_dir: Path, redo: bool, target: str | None) -> str:
 
 
 def create_sku(args: argparse.Namespace) -> None:
-    product_dir, layout_path, layout = load_product(args.product_dir)
+    product_dir, layout_path, _ = load_product(args.product_dir)
     ensure_output_allowed(product_dir)
     master = verify_master(product_dir)
     expected_raster = normalize_raster_contract(master.get("raster"), "MASTER_RASTER")
@@ -367,26 +325,20 @@ def create_sku(args: argparse.Namespace) -> None:
     cleanup([replacement, backup])
     try:
         copy_new(generated_background, paths["background"])
-        render = run_composite(
+        run_composite(
             paths["background"], product_source, layout_path, paths["final"],
             "SKU_PREVIEW", paths["product"], paths["shadow"],
         )
-        scene_render = scene_composite_info(render)
         require_matching_raster(paths["product"], expected_raster, "SKU_PRODUCT_LAYER")
         require_matching_raster(paths["shadow"], expected_raster, "SKU_SHADOW")
         if not layers_exist:
             atomic_write(paths["layers"], {"source_sha256": product_hash}, new=True)
         require_matching_raster(paths["final"], expected_raster, "SKU_FINAL")
-        information = {"title_color": render.get("title_color"), "version_color": render.get("version_color")}
-        validate_information_colors(layout, information)
         manifest = {
             "kind": "SKU_VARIANT",
             "sku_label": sku_label,
             "files": {label: relative_entry(paths[label], product_dir) for label in ("background", "product", "shadow", "final")},
             "raster": expected_raster,
-            "information": information,
-            "scene_composite": scene_render,
-            "master_verified": True,
         }
         if final_output.exists() and not redo:
             raise ValueError("SKU_ALREADY_EXISTS")

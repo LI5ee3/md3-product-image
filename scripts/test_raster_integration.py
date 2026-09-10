@@ -79,7 +79,6 @@ def main() -> None:
             "scene_prompt.py", "build",
             "--mode", "MASTER",
             "--layout", str(layout),
-            "--target", "01",
         )
         preview = json.loads(run(
             "artifact_flow.py", "preview",

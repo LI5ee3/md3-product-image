@@ -48,7 +48,7 @@ For the first master, run `scripts/measure_text.py` with the authoritative produ
 
 The script creates `PRODUCT_DIRECTORY/reusable/layout.json`, the cropped Logo, and title/version masks. If the layout already exists, reuse it. Stop if the source identity conflicts with its recorded hashes; never silently replace reusable assets.
 
-Treat the canvas recorded by `measure_text.py` as logical normalized layout coordinates. `compose_scene.py` and `compose_image.py` apply those normalized positions to the actual 3:4 raster delivered by Image Gen.
+Treat the canvas recorded by `measure_text.py` as logical normalized layout coordinates. `compose_image.py` applies those normalized positions to the actual 3:4 raster delivered by Image Gen.
 
 ### 2. Prepare or verify the deterministic palette reference
 
@@ -96,7 +96,7 @@ The authoritative product image remains available locally for the final product 
 For a master:
 
 ```text
-python scripts/scene_prompt.py build --mode MASTER --layout <reusable/layout.json> --target <candidate-id>
+python scripts/scene_prompt.py build --mode MASTER --layout <reusable/layout.json>
 ```
 
 For an SKU:
@@ -112,7 +112,7 @@ The active master background prompt in `references/image-gen-prompt.md` is the v
 The prompt order is:
 
 1. current `references/image-gen-prompt.md`
-2. `references/replace-variant-block.md` for SKU only
+2. fixed SKU edit block for SKU only
 3. merged information safe-zone block
 4. every user-supplied accumulated addition from `reusable/prompt-additions.json`
 5. canonical product and shadow placement policy
@@ -146,7 +146,7 @@ Run:
 python scripts/artifact_flow.py preview --generated-background <background> --product <product.png> --product-dir <PRODUCT_DIRECTORY> --candidate-id <id>
 ```
 
-The command first verifies that the delivered MASTER background is an exact 3:4 raster, then immediately creates one full-size composite at that same actual raster containing the exact cached or newly prepared product layer, its fixed shadow, cached Logo, and cached text. Reuse an existing product layer and shadow for the same candidate; a redo changes only the background, scene, and final preview. Show the full-size preview and stop.
+The command first verifies that the delivered MASTER background is an exact 3:4 raster, then immediately creates one full-size composite at that same actual raster containing the exact cached or newly prepared product layer, its fixed shadow, cached Logo, and cached text. Reuse an existing product layer and shadow for the same candidate; a redo changes only the background and final preview. Show the full-size preview and stop.
 
 Do not use visual heuristics to accept, reject, or regenerate. The user owns the visual decision.
 
@@ -166,7 +166,7 @@ Only after `重做母版`, run:
 
 ```text
 python scripts/artifact_flow.py discard-preview --product-dir <PRODUCT_DIRECTORY> --candidate-id <id>
-python scripts/scene_prompt.py build --mode MASTER --layout <reusable/layout.json> --target <id> --redo [--additional-prompt <user text>]
+python scripts/scene_prompt.py build --mode MASTER --layout <reusable/layout.json> --redo [--additional-prompt <user text>]
 ```
 
 Then verify/reuse the same MASTER palette reference, build, generate, composite, show exactly one new preview, and stop. The optional addition is stored and automatically included in this and all later prompts for the product.
@@ -186,16 +186,16 @@ The script writes the completed image directly to its automatically assigned seq
 Only after an explicit SKU redo request, build with the existing label:
 
 ```text
-python scripts/scene_prompt.py build --mode SKU --layout <reusable/layout.json> --master <reusable/master.json> --redo [--target <SKU_VARIANT-X>] [--additional-prompt <user text>]
+python scripts/scene_prompt.py build --mode SKU --layout <reusable/layout.json> --master <reusable/master.json> --redo [--additional-prompt <user text>]
 ```
 
-Omit `--target` to redo the most recently completed SKU. Reuse the cached product layer, shadow, and source-hash-keyed palette reference for that exact SKU source. Generate one replacement background, then run:
+Prompt construction is SKU-label independent. Reuse the cached product layer, shadow, and source-hash-keyed palette reference for the SKU being redone. Generate one replacement background, then run:
 
 ```text
 python scripts/artifact_flow.py sku --generated-background <background> --product <current-SKU.png-or-webp> --product-dir <PRODUCT_DIRECTORY> --redo [--target <SKU_VARIANT-X>]
 ```
 
-Use the same explicit target as prompt build when one was supplied; otherwise both commands resolve the most recently completed SKU. Keep the existing output unchanged until the replacement composite passes deterministic checks, including the MASTER raster contract, then atomically replace it without changing the filename. A failed redo must preserve the existing final. A redo does not consume a new sequential label.
+Use `--target <SKU_VARIANT-X>` on `artifact_flow.py sku` when the user explicitly names an SKU; otherwise the redo resolves the most recently completed SKU. Keep the existing output unchanged until the replacement composite passes deterministic checks, including the MASTER raster contract, then atomically replace it without changing the filename. A failed redo must preserve the existing final. A redo does not consume a new sequential label.
 
 For a new SKU after any redo, omit `--redo`; assign the next unused label normally.
 

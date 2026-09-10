@@ -2,7 +2,6 @@
 """Build deterministic Image Gen prompts without persistent attempt state."""
 
 import argparse
-import re
 import sys
 from pathlib import Path
 
@@ -12,7 +11,6 @@ from common import atomic_write, read_json, verify_information_assets, verify_ma
 SKILL_DIR = Path(__file__).resolve().parent.parent
 IMAGE_PROMPT_REFERENCE = SKILL_DIR / "references" / "image-gen-prompt.md"
 PROMPT_ADDITIONS_NAME = "prompt-additions.json"
-SKU_TARGET_PATTERN = re.compile(r"SKU_VARIANT-([A-Z]+)")
 FINAL_SAFE_ZONE_MARGIN = 0.05
 PRODUCT_AREA_POLICY = """Product and shadow placement policy:
 FINAL_INFORMATION_SAFE_ZONE is the only area that must be empty.
@@ -111,74 +109,8 @@ def additions_block(entries: list[str]) -> str | None:
     return "\n".join(lines)
 
 
-def validate_target(value: str) -> str:
-    value = value.strip()
-    if not value or value in {".", ".."} or any(char in value for char in "/\\\x00"):
-        raise ValueError("TARGET_INVALID")
-    return value
-
-
-def sku_letters(number: int) -> str:
-    result = ""
-    while number:
-        number, remainder = divmod(number - 1, 26)
-        result = chr(65 + remainder) + result
-    return result
-
-
-def existing_sku_targets(product_dir: Path) -> list[str]:
-    return sorted(
-        (
-            path.stem
-            for path in (product_dir / "output").glob("SKU_VARIANT-*.png")
-            if SKU_TARGET_PATTERN.fullmatch(path.stem)
-        ),
-        key=lambda label: (
-            len(SKU_TARGET_PATTERN.fullmatch(label).group(1)),
-            label,
-        ),
-    )
-
-
-def next_sku_target(product_dir: Path) -> str:
-    existing = {
-        match.group(1)
-        for path in (product_dir / "output").glob("SKU_VARIANT-*.png")
-        if (match := SKU_TARGET_PATTERN.fullmatch(path.stem))
-    }
-    number = 1
-    while sku_letters(number) in existing:
-        number += 1
-    return f"SKU_VARIANT-{sku_letters(number)}"
-
-
-def resolve_target(args: argparse.Namespace, product_dir: Path) -> str:
-    if args.mode == "MASTER":
-        if not args.target:
-            raise ValueError("TARGET_REQUIRED")
-        return validate_target(args.target)
-
-    if args.target:
-        target = validate_target(args.target)
-        if not args.redo or not SKU_TARGET_PATTERN.fullmatch(target):
-            raise ValueError("SKU_TARGET_IS_AUTOMATIC")
-        if not (product_dir / "output" / f"{target}.png").is_file():
-            raise ValueError("SKU_REDO_TARGET_MISSING")
-        return target
-
-    if args.redo:
-        existing = existing_sku_targets(product_dir)
-        if not existing:
-            raise ValueError("SKU_REDO_TARGET_MISSING")
-        return existing[-1]
-
-    return next_sku_target(product_dir)
-
-
 def build_prompt(args: argparse.Namespace) -> None:
     layout, product_dir = load_layout(Path(args.layout))
-    resolve_target(args, product_dir)
-
     if args.mode == "SKU":
         if not args.master:
             raise ValueError("MASTER_MANIFEST_REQUIRED")
@@ -214,7 +146,6 @@ def main() -> None:
     parser.add_argument("build", choices=("build",))
     parser.add_argument("--mode", required=True, choices=("MASTER", "SKU"))
     parser.add_argument("--layout", required=True)
-    parser.add_argument("--target")
     parser.add_argument("--master")
     parser.add_argument("--redo", action="store_true")
     parser.add_argument("--additional-prompt")

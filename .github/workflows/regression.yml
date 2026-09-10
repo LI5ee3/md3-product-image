@@ -41,11 +41,9 @@ jobs:
             scripts/scene_prompt.py \
             scripts/compose_image.py \
             scripts/artifact_flow.py \
-            scripts/validate_raster.py \
             scripts/extract_palette.py \
             scripts/palette_cache.py \
             scripts/test_workflow.py \
-            scripts/test_raster_contract.py \
             scripts/test_raster_integration.py \
             scripts/test_prompt_structure.py \
             scripts/test_extract_palette.py \
@@ -54,9 +52,6 @@ jobs:
 
       - name: Original workflow regression
         run: python scripts/test_workflow.py
-
-      - name: Raster contract regression
-        run: python scripts/test_raster_contract.py
 
       - name: Raster production integration regression
         run: python scripts/test_raster_integration.py

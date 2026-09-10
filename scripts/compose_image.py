@@ -64,12 +64,12 @@ def clean_product(product: Image.Image) -> Image.Image:
     return cleaned.crop(bbox)
 
 
-def placement_profile(aspect: float) -> tuple[str, float, float]:
+def placement_limits(aspect: float) -> tuple[float, float]:
     if aspect >= WIDE_PRODUCT_ASPECT:
-        return "WIDE", WIDE_PRODUCT_MAX_WIDTH_FRAC, PRODUCT_BOTTOM_MARGIN_FRAC
+        return WIDE_PRODUCT_MAX_WIDTH_FRAC, PRODUCT_BOTTOM_MARGIN_FRAC
     if aspect < TALL_PRODUCT_ASPECT:
-        return "TALL", PRODUCT_MAX_WIDTH_FRAC, TALL_PRODUCT_BOTTOM_MARGIN_FRAC
-    return "STANDARD", PRODUCT_MAX_WIDTH_FRAC, PRODUCT_BOTTOM_MARGIN_FRAC
+        return PRODUCT_MAX_WIDTH_FRAC, TALL_PRODUCT_BOTTOM_MARGIN_FRAC
+    return PRODUCT_MAX_WIDTH_FRAC, PRODUCT_BOTTOM_MARGIN_FRAC
 
 
 def fit_product(
@@ -178,21 +178,13 @@ def main() -> None:
             shadow = load_image(shadow_mask_path, "L")
             if product_layer.size != background.size or shadow.size != background.size:
                 raise ValueError("CACHED_LAYER_SIZE_MISMATCH")
-            bbox = product_layer.getchannel("A").getbbox()
-            if bbox is None:
+            if product_layer.getchannel("A").getbbox() is None:
                 raise ValueError("CACHED_PRODUCT_LAYER_EMPTY")
-            left, top, right, bottom = bbox
-            source_aspect = (right - left) / (bottom - top)
-            profile, max_width_frac, bottom_margin_frac = placement_profile(source_aspect)
-            distance = (bottom - top) * SHADOW_DISTANCE_FRAC
-            radians = math.radians(ANGLE_DEGREES)
-            offset_x = round(distance * math.cos(radians))
-            offset_y = round(distance * math.sin(radians))
-            blur = max(1, round(height * SHADOW_BLUR_FRAC))
         else:
             product = clean_product(load_image(product_path, "RGBA"))
-            source_aspect = product.width / product.height
-            profile, max_width_frac, bottom_margin_frac = placement_profile(source_aspect)
+            max_width_frac, bottom_margin_frac = placement_limits(
+                product.width / product.height
+            )
             product = fit_product(product, *background.size, max_width_frac)
             right = width - round(width * PRODUCT_RIGHT_MARGIN_FRAC)
             bottom = height - round(height * bottom_margin_frac)
@@ -238,33 +230,7 @@ def main() -> None:
     except (KeyError, TypeError, OSError, json.JSONDecodeError, ValueError) as exc:
         sys.exit(str(exc))
 
-    json.dump(
-        {
-            "output": str(output),
-            "output_kind": args.output_kind,
-            "title_color": "2C2C2C",
-            "version_color": "5A5A5A" if version_rect else None,
-            "product_layer": str(product_layer_path),
-            "shadow_mask": str(shadow_mask_path),
-            "product_box": {"left": left, "top": top, "right": right, "bottom": bottom},
-            "placement": {
-                "profile": profile,
-                "source_aspect": round(source_aspect, 4),
-                "max_width_frac": max_width_frac,
-                "bottom_margin_frac": bottom_margin_frac,
-            },
-            "shadow": {
-                "angle_degrees": ANGLE_DEGREES,
-                "offset_x": offset_x,
-                "offset_y": offset_y,
-                "blur_radius": blur,
-                "opacity": SHADOW_OPACITY,
-            },
-        },
-        sys.stdout,
-        ensure_ascii=False,
-        indent=2,
-    )
+    json.dump({"output": str(output)}, sys.stdout, ensure_ascii=False)
     print()
 
 
