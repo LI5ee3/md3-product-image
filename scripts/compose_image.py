@@ -1,14 +1,28 @@
 #!/usr/bin/env python3
-"""Apply cached Logo and text assets to a prepared product scene."""
+"""Composite product, deterministic shadow, Logo, and text in one pass."""
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops, ImageFilter
 
 
+ANGLE_DEGREES = 50
+PRODUCT_HEIGHT_FRAC = 0.54
+PRODUCT_MAX_WIDTH_FRAC = 0.52
+WIDE_PRODUCT_ASPECT = 1.35
+WIDE_PRODUCT_MAX_WIDTH_FRAC = 0.68
+TALL_PRODUCT_ASPECT = 0.90
+PRODUCT_RIGHT_MARGIN_FRAC = 0.12
+PRODUCT_BOTTOM_MARGIN_FRAC = 0.18
+TALL_PRODUCT_BOTTOM_MARGIN_FRAC = 0.12
+SHADOW_DISTANCE_FRAC = 0.16
+SHADOW_BLUR_FRAC = 0.007
+SHADOW_OPACITY = 0.28
+PRODUCT_ALPHA_CORE = 224
 TITLE_COLOR = (44, 44, 44)
 VERSION_COLOR = (90, 90, 90)
 OUTPUT_KINDS = ("CANDIDATE", "SKU_PREVIEW")
@@ -22,6 +36,51 @@ def load_image(path: Path, mode: str) -> Image.Image:
             return image
     except OSError as exc:
         raise ValueError(f"ASSET_UNREADABLE: {path}: {exc}") from exc
+
+
+def new_output(path: Path) -> None:
+    if path.exists():
+        raise ValueError(f"REFUSE_OVERWRITE: {path}")
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def clean_product(product: Image.Image) -> Image.Image:
+    alpha = product.getchannel("A")
+    if alpha.getextrema() == (255, 255):
+        return product
+    core = alpha.point(lambda value: 255 if value >= PRODUCT_ALPHA_CORE else 0)
+    bbox = core.getbbox()
+    if bbox is None:
+        return product
+    expansion = max(3, round(min(product.size) * 0.004))
+    if expansion % 2 == 0:
+        expansion += 1
+    keep = core.filter(ImageFilter.MaxFilter(expansion))
+    cleaned = product.copy()
+    cleaned.putalpha(ImageChops.multiply(alpha, keep))
+    bbox = cleaned.getchannel("A").getbbox()
+    if bbox is None:
+        return product
+    return cleaned.crop(bbox)
+
+
+def placement_profile(aspect: float) -> tuple[str, float, float]:
+    if aspect >= WIDE_PRODUCT_ASPECT:
+        return "WIDE", WIDE_PRODUCT_MAX_WIDTH_FRAC, PRODUCT_BOTTOM_MARGIN_FRAC
+    if aspect < TALL_PRODUCT_ASPECT:
+        return "TALL", PRODUCT_MAX_WIDTH_FRAC, TALL_PRODUCT_BOTTOM_MARGIN_FRAC
+    return "STANDARD", PRODUCT_MAX_WIDTH_FRAC, PRODUCT_BOTTOM_MARGIN_FRAC
+
+
+def fit_product(
+    product: Image.Image, width: int, height: int, max_width_frac: float
+) -> Image.Image:
+    scale = min(
+        height * PRODUCT_HEIGHT_FRAC / product.height,
+        width * max_width_frac / product.width,
+    )
+    size = (max(1, round(product.width * scale)), max(1, round(product.height * scale)))
+    return product.resize(size, Image.Resampling.LANCZOS)
 
 
 def target_box(rect: dict, width: int, height: int) -> tuple[int, int, int, int]:
@@ -48,7 +107,7 @@ def asset_path(reusable_dir: Path, rect: dict) -> Path:
 
 
 def paste_layer(
-    scene: Image.Image,
+    image: Image.Image,
     reusable_dir: Path,
     rect: dict,
     color: tuple[int, int, int] | None,
@@ -63,14 +122,14 @@ def paste_layer(
         mask = layer
         layer = Image.new("RGBA", mask.size, color + (255,))
         layer.putalpha(mask)
-    scene.alpha_composite(layer, (left, top))
+    image.alpha_composite(layer, (left, top))
 
 
 def validate_output(kind: str, output: Path, product_dir: Path) -> None:
     if output.parent != product_dir or output.suffix.lower() != ".png":
         raise ValueError("OUTPUT_PATH_INVALID")
     if kind == "CANDIDATE":
-        valid = output.name.startswith("master-candidate-") and not output.name.endswith("-scene.png")
+        valid = output.name.startswith("master-candidate-") and output.name.endswith("-preview.png")
     else:
         valid = output.name.startswith("SKU_VARIANT-") and output.name.endswith("-preview.png")
     if not valid:
@@ -81,42 +140,101 @@ def validate_output(kind: str, output: Path, product_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--scene", required=True)
+    parser.add_argument("--background", required=True)
+    parser.add_argument("--product", required=True)
     parser.add_argument("--layout", required=True)
     parser.add_argument("--output", required=True)
     parser.add_argument("--output-kind", required=True, choices=OUTPUT_KINDS)
+    parser.add_argument("--product-layer", required=True)
+    parser.add_argument("--shadow-mask", required=True)
+    parser.add_argument("--reuse-layers", action="store_true")
     args = parser.parse_args()
 
-    scene_path = Path(args.scene).expanduser().resolve()
+    background_path = Path(args.background).expanduser().resolve()
+    product_path = Path(args.product).expanduser().resolve()
     layout_path = Path(args.layout).expanduser().resolve()
     reusable_dir = layout_path.parent
     product_dir = reusable_dir.parent
     output = Path(args.output).expanduser().resolve()
+    product_layer_path = Path(args.product_layer).expanduser().resolve()
+    shadow_mask_path = Path(args.shadow_mask).expanduser().resolve()
 
     try:
         if layout_path != product_dir / "reusable" / "layout.json":
             raise ValueError("LAYOUT_PATH_INVALID")
-        if scene_path.parent != product_dir:
-            raise ValueError("SCENE_OUTSIDE_PRODUCT_DIRECTORY")
         validate_output(args.output_kind, output, product_dir)
         with layout_path.open(encoding="utf-8") as handle:
             layout = json.load(handle)
         if layout.get("product_directory") != str(product_dir):
             raise ValueError("PRODUCT_DIRECTORY_MISMATCH")
-        scene = load_image(scene_path, "RGBA")
-        width, height = scene.size
+
+        background = load_image(background_path, "RGBA")
+        width, height = background.size
         if width * 4 != height * 3 or layout.get("canvas", {}).get("ratio") != "3:4":
-            raise ValueError("SCENE_NOT_3_4")
+            raise ValueError("BACKGROUND_NOT_3_4")
+
+        if args.reuse_layers:
+            product_layer = load_image(product_layer_path, "RGBA")
+            shadow = load_image(shadow_mask_path, "L")
+            if product_layer.size != background.size or shadow.size != background.size:
+                raise ValueError("CACHED_LAYER_SIZE_MISMATCH")
+            bbox = product_layer.getchannel("A").getbbox()
+            if bbox is None:
+                raise ValueError("CACHED_PRODUCT_LAYER_EMPTY")
+            left, top, right, bottom = bbox
+            source_aspect = (right - left) / (bottom - top)
+            profile, max_width_frac, bottom_margin_frac = placement_profile(source_aspect)
+            distance = (bottom - top) * SHADOW_DISTANCE_FRAC
+            radians = math.radians(ANGLE_DEGREES)
+            offset_x = round(distance * math.cos(radians))
+            offset_y = round(distance * math.sin(radians))
+            blur = max(1, round(height * SHADOW_BLUR_FRAC))
+        else:
+            product = clean_product(load_image(product_path, "RGBA"))
+            source_aspect = product.width / product.height
+            profile, max_width_frac, bottom_margin_frac = placement_profile(source_aspect)
+            product = fit_product(product, *background.size, max_width_frac)
+            right = width - round(width * PRODUCT_RIGHT_MARGIN_FRAC)
+            bottom = height - round(height * bottom_margin_frac)
+            left = right - product.width
+            top = bottom - product.height
+            if left < 0 or top < 0:
+                raise ValueError("PRODUCT_PLACEMENT_OUTSIDE_CANVAS")
+            product_layer = Image.new("RGBA", background.size, (0, 0, 0, 0))
+            product_layer.alpha_composite(product, (left, top))
+            product_mask = product_layer.getchannel("A")
+            distance = product.height * SHADOW_DISTANCE_FRAC
+            radians = math.radians(ANGLE_DEGREES)
+            offset_x = round(distance * math.cos(radians))
+            offset_y = round(distance * math.sin(radians))
+            shadow = Image.new("L", background.size, 0)
+            shadow.paste(product_mask, (offset_x, offset_y))
+            blur = max(1, round(height * SHADOW_BLUR_FRAC))
+            shadow = shadow.filter(ImageFilter.GaussianBlur(blur))
+            shadow = shadow.point(lambda value: round(value * SHADOW_OPACITY))
+
+        shadow_layer = Image.new("RGBA", background.size, (0, 0, 0, 0))
+        shadow_layer.putalpha(shadow)
+        image = Image.alpha_composite(background, shadow_layer)
+        image = Image.alpha_composite(image, product_layer).convert("RGB").convert("RGBA")
+
         elements = layout["elements"]
         logo_rect = elements["LOGO_RECT"]
         title_rects = elements["TITLE_LINE_RECT"]
         version_rect = elements.get("VERSION_TEXT_RECT")
-        paste_layer(scene, reusable_dir, logo_rect, None, width, height)
+        paste_layer(image, reusable_dir, logo_rect, None, width, height)
         for rect in title_rects:
-            paste_layer(scene, reusable_dir, rect, TITLE_COLOR, width, height)
+            paste_layer(image, reusable_dir, rect, TITLE_COLOR, width, height)
         if version_rect:
-            paste_layer(scene, reusable_dir, version_rect, VERSION_COLOR, width, height)
-        scene.convert("RGB").save(output, "PNG")
+            paste_layer(image, reusable_dir, version_rect, VERSION_COLOR, width, height)
+
+        new_output(output)
+        image.convert("RGB").save(output, "PNG")
+        if not args.reuse_layers:
+            for path in (product_layer_path, shadow_mask_path):
+                new_output(path)
+            product_layer.save(product_layer_path, "PNG")
+            shadow.save(shadow_mask_path, "PNG")
     except (KeyError, TypeError, OSError, json.JSONDecodeError, ValueError) as exc:
         sys.exit(str(exc))
 
@@ -126,6 +244,22 @@ def main() -> None:
             "output_kind": args.output_kind,
             "title_color": "2C2C2C",
             "version_color": "5A5A5A" if version_rect else None,
+            "product_layer": str(product_layer_path),
+            "shadow_mask": str(shadow_mask_path),
+            "product_box": {"left": left, "top": top, "right": right, "bottom": bottom},
+            "placement": {
+                "profile": profile,
+                "source_aspect": round(source_aspect, 4),
+                "max_width_frac": max_width_frac,
+                "bottom_margin_frac": bottom_margin_frac,
+            },
+            "shadow": {
+                "angle_degrees": ANGLE_DEGREES,
+                "offset_x": offset_x,
+                "offset_y": offset_y,
+                "blur_radius": blur,
+                "opacity": SHADOW_OPACITY,
+            },
         },
         sys.stdout,
         ensure_ascii=False,

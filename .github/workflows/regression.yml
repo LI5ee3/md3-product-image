@@ -39,7 +39,6 @@ jobs:
             scripts/common.py \
             scripts/measure_text.py \
             scripts/scene_prompt.py \
-            scripts/compose_scene.py \
             scripts/compose_image.py \
             scripts/artifact_flow.py \
             scripts/validate_raster.py \

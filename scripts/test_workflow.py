@@ -117,6 +117,9 @@ def main() -> None:
         run("artifact_flow.py", "bind", "--product-dir", str(product_dir), "--candidate-id", "01")
         master = reusable / "master.json"
         assert master.is_file()
+        assert "scene" not in json.loads(master.read_text(encoding="utf-8"))["files"]
+        assert not list(product_dir.glob("*-scene.png"))
+        assert not (reusable / "ORIGINAL_MASTER_SCENE.png").exists()
         assert {path.name for path in (product_dir / "output").iterdir()} == {"ORIGINAL_MASTER_FINAL.png"}
 
         sku_prompt = scene_prompt(layout, "SKU", master=master)

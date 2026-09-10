@@ -24,7 +24,7 @@ Use `<output root>/<exact complete product name>` as `PRODUCT_DIRECTORY`. Keep a
 - `palette.json` and `palette-reference.png` for the MASTER source
 - source-hash-keyed SKU palette assets under `reusable/palettes/`
 - cached placed product layers and fixed 2D shadows
-- bound master background, product, shadow, scene, and `master.json`
+- bound master background, product, shadow, and `master.json`
 
 Keep only `output/ORIGINAL_MASTER_FINAL.png` and confirmed sequential `output/SKU_VARIANT-*.png` files in `output`. Keep full-size previews, manifests, and other temporary artifacts in `PRODUCT_DIRECTORY`. Never create thumbnails.
 

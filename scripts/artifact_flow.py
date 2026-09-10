@@ -11,7 +11,6 @@ from pathlib import Path
 
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
-SCENE_COMPOSE_SCRIPT = SCRIPTS_DIR / "compose_scene.py"
 COMPOSE_SCRIPT = SCRIPTS_DIR / "compose_image.py"
 TITLE_COLOR = "2C2C2C"
 VERSION_COLOR = "5A5A5A"
@@ -97,24 +96,24 @@ def run_script(arguments: list[str]) -> dict:
         raise ValueError(f"SCRIPT_OUTPUT_INVALID: {arguments[0]}") from exc
 
 
-def run_compose(scene: Path, layout: Path, output: Path, output_kind: str) -> dict:
-    return run_script([
-        str(COMPOSE_SCRIPT),
-        "--scene", str(scene),
-        "--layout", str(layout),
-        "--output", str(output),
-        "--output-kind", output_kind,
-    ])
-
-
-def run_scene_compose(background: Path, product: Path, scene: Path, product_layer: Path, shadow_mask: Path) -> dict:
+def run_composite(
+    background: Path,
+    product: Path,
+    layout: Path,
+    output: Path,
+    output_kind: str,
+    product_layer: Path,
+    shadow_mask: Path,
+) -> dict:
     if product_layer.exists() != shadow_mask.exists():
         raise ValueError("CACHED_PRODUCT_SHADOW_INCOMPLETE")
     command = [
-        str(SCENE_COMPOSE_SCRIPT),
+        str(COMPOSE_SCRIPT),
         "--background", str(background),
         "--product", str(product),
-        "--output", str(scene),
+        "--layout", str(layout),
+        "--output", str(output),
+        "--output-kind", output_kind,
         "--product-layer", str(product_layer),
         "--shadow-mask", str(shadow_mask),
     ]
@@ -155,7 +154,6 @@ def preview_paths(product_dir: Path, candidate_id: str) -> dict[str, Path]:
         "background": product_dir / f"{prefix}-background.png",
         "product": reusable_dir / f"master-candidate-{candidate_id}-product.png",
         "shadow": reusable_dir / f"master-candidate-{candidate_id}-shadow.png",
-        "scene": product_dir / f"{prefix}-scene.png",
         "final": product_dir / f"{prefix}.png",
         "manifest": product_dir / f"{prefix}.json",
     }
@@ -180,11 +178,13 @@ def create_preview(args: argparse.Namespace) -> None:
         copy_new(args.generated_background, paths["background"])
         background_raster = require_three_four_raster(paths["background"], "MASTER_BACKGROUND")
         raster = {"width": int(background_raster["width"]), "height": int(background_raster["height"]), "ratio": "3:4"}
-        scene_render = scene_composite_info(run_scene_compose(paths["background"], product_source, paths["scene"], paths["product"], paths["shadow"]))
+        render = run_composite(
+            paths["background"], product_source, layout_path, paths["final"],
+            "CANDIDATE", paths["product"], paths["shadow"],
+        )
+        scene_render = scene_composite_info(render)
         require_matching_raster(paths["product"], raster, "MASTER_PRODUCT_LAYER")
         require_matching_raster(paths["shadow"], raster, "MASTER_SHADOW")
-        require_matching_raster(paths["scene"], raster, "MASTER_SCENE")
-        render = run_compose(paths["scene"], layout_path, paths["final"], "CANDIDATE")
         require_matching_raster(paths["final"], raster, "MASTER_FINAL")
         information = {"title_color": render.get("title_color"), "version_color": render.get("version_color")}
         validate_information_colors(layout, information)
@@ -212,7 +212,7 @@ def load_preview(product_dir: Path, candidate_id: str) -> tuple[dict, dict[str, 
     if manifest.get("kind") != "MASTER_CANDIDATE_PREVIEW" or manifest.get("candidate_id") != candidate_id:
         raise ValueError("PREVIEW_MANIFEST_INVALID")
     raster = normalize_raster_contract(manifest.get("raster"), "PREVIEW_RASTER")
-    for label in ("background", "product", "shadow", "scene", "final"):
+    for label in ("background", "product", "shadow", "final"):
         require_matching_raster(paths[label], raster, f"PREVIEW_{label.upper()}")
     for label in ("background", "final"):
         expected_hash = manifest.get(f"{label}_sha256")
@@ -247,7 +247,6 @@ def bind_candidate(args: argparse.Namespace) -> None:
         "background": reusable_dir / "ORIGINAL_MASTER_BACKGROUND.png",
         "product": reusable_dir / "ORIGINAL_MASTER_PRODUCT.png",
         "shadow": reusable_dir / "ORIGINAL_MASTER_SHADOW.png",
-        "scene": reusable_dir / "ORIGINAL_MASTER_SCENE.png",
         "final": product_dir / "output" / "ORIGINAL_MASTER_FINAL.png",
         "manifest": reusable_dir / "master.json",
     }
@@ -255,7 +254,7 @@ def bind_candidate(args: argparse.Namespace) -> None:
         raise ValueError("MASTER_ALREADY_EXISTS")
     created = list(targets.values())
     try:
-        for label in ("background", "product", "shadow", "scene", "final"):
+        for label in ("background", "product", "shadow", "final"):
             copy_new(preview_files[label], targets[label])
             require_matching_raster(targets[label], raster, f"MASTER_{label.upper()}")
         information = preview.get("information")
@@ -271,7 +270,6 @@ def bind_candidate(args: argparse.Namespace) -> None:
                 "background": relative_entry(targets["background"], product_dir),
                 "product": relative_entry(targets["product"], product_dir),
                 "shadow": relative_entry(targets["shadow"], product_dir),
-                "scene": relative_entry(targets["scene"], product_dir),
                 "final": relative_entry(targets["final"], product_dir),
             },
             "raster": raster,
@@ -299,7 +297,6 @@ def sku_preview_paths(product_dir: Path, sku_label: str) -> dict[str, Path]:
         "product": reusable_dir / f"{sku_label}-product.png",
         "shadow": reusable_dir / f"{sku_label}-shadow.png",
         "layers": reusable_dir / f"{sku_label}-layers.json",
-        "scene": product_dir / f"{prefix}-scene.png",
         "final": product_dir / f"{prefix}.png",
         "manifest": product_dir / f"{prefix}.json",
     }
@@ -351,7 +348,7 @@ def create_sku(args: argparse.Namespace) -> None:
     redo = bool(args.redo)
     sku_label = resolve_sku_label(product_dir, redo, args.target)
     paths = sku_preview_paths(product_dir, sku_label)
-    cleanup([paths[label] for label in ("background", "scene", "final", "manifest")])
+    cleanup([paths[label] for label in ("background", "final", "manifest")])
     product_source = Path(args.product).expanduser().resolve()
     product_hash = sha256_file(product_source)
     layers_exist = paths["product"].exists() and paths["shadow"].exists()
@@ -361,7 +358,7 @@ def create_sku(args: argparse.Namespace) -> None:
             raise ValueError("CACHED_PRODUCT_SOURCE_MISMATCH")
     elif any(paths[label].exists() for label in ("product", "shadow", "layers")):
         raise ValueError("CACHED_PRODUCT_SHADOW_INCOMPLETE")
-    created = [paths[label] for label in ("background", "scene", "final", "manifest")]
+    created = [paths[label] for label in ("background", "final", "manifest")]
     if not layers_exist:
         created.extend(paths[label] for label in ("product", "shadow", "layers"))
     final_output = product_dir / "output" / f"{sku_label}.png"
@@ -370,20 +367,22 @@ def create_sku(args: argparse.Namespace) -> None:
     cleanup([replacement, backup])
     try:
         copy_new(generated_background, paths["background"])
-        scene_render = scene_composite_info(run_scene_compose(paths["background"], product_source, paths["scene"], paths["product"], paths["shadow"]))
+        render = run_composite(
+            paths["background"], product_source, layout_path, paths["final"],
+            "SKU_PREVIEW", paths["product"], paths["shadow"],
+        )
+        scene_render = scene_composite_info(render)
         require_matching_raster(paths["product"], expected_raster, "SKU_PRODUCT_LAYER")
         require_matching_raster(paths["shadow"], expected_raster, "SKU_SHADOW")
-        require_matching_raster(paths["scene"], expected_raster, "SKU_SCENE")
         if not layers_exist:
             atomic_write(paths["layers"], {"source_sha256": product_hash}, new=True)
-        render = run_compose(paths["scene"], layout_path, paths["final"], "SKU_PREVIEW")
         require_matching_raster(paths["final"], expected_raster, "SKU_FINAL")
         information = {"title_color": render.get("title_color"), "version_color": render.get("version_color")}
         validate_information_colors(layout, information)
         manifest = {
             "kind": "SKU_VARIANT",
             "sku_label": sku_label,
-            "files": {label: relative_entry(paths[label], product_dir) for label in ("background", "product", "shadow", "scene", "final")},
+            "files": {label: relative_entry(paths[label], product_dir) for label in ("background", "product", "shadow", "final")},
             "raster": expected_raster,
             "information": information,
             "scene_composite": scene_render,

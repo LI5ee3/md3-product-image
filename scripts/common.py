@@ -149,7 +149,6 @@ def verify_master(product_dir: Path) -> dict:
         "background": reusable / "ORIGINAL_MASTER_BACKGROUND.png",
         "product": reusable / "ORIGINAL_MASTER_PRODUCT.png",
         "shadow": reusable / "ORIGINAL_MASTER_SHADOW.png",
-        "scene": reusable / "ORIGINAL_MASTER_SCENE.png",
         "final": product_dir / "output" / "ORIGINAL_MASTER_FINAL.png",
     }
     for label, path in expected.items():
@@ -169,6 +168,6 @@ def verify_master(product_dir: Path) -> dict:
         manifest = dict(manifest)
         manifest["raster"] = raster_contract
 
-    for label in ("background", "product", "shadow", "scene", "final"):
+    for label in ("background", "product", "shadow", "final"):
         require_matching_raster(expected[label], raster_contract, f"MASTER_{label.upper()}")
     return manifest
