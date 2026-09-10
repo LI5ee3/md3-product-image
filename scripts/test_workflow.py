@@ -214,5 +214,104 @@ def main() -> None:
         print("md3-product-image workflow self-check passed")
 
 
+def release_contract_checks() -> None:
+    root = SCRIPTS.parent
+    active_prompt = root / "references" / "image-gen-prompt.md"
+    assert active_prompt.is_file()
+    assert not (root / "references" / "image-gen-prompt.txt").exists()
+    assert not (root / "references" / "image-gen-prompt-v2-baseline.txt").exists()
+    prompt_text = active_prompt.read_text(encoding="utf-8")
+    prompt_lines = prompt_text.splitlines()
+    headings = [
+        "DELIVERABLE",
+        "REFERENCE ROLES",
+        "VISUAL SYSTEM",
+        "PALETTE",
+        "COMPOSITION",
+        "LIGHTING",
+        "EXCLUSIONS",
+        "OUTPUT CONTRACT",
+    ]
+    positions = []
+    for heading in headings:
+        markdown_heading = f"## {heading}"
+        assert prompt_lines.count(markdown_heading) == 1
+        positions.append(prompt_lines.index(markdown_heading))
+    assert positions == sorted(positions)
+    assert "PALETTE_REFERENCE: authoritative color-only palette reference." in prompt_text
+    assert "Return exactly one empty 3:4 background plate." in prompt_text
+
+    skill = (root / "SKILL.md").read_text(encoding="utf-8")
+    for needle in [
+        "always use `referenced_image_paths`",
+        "Omit `num_last_images_to_include` entirely",
+        "mutually exclusive",
+        "reusable/palette-reference.png",
+        "reusable/ORIGINAL_MASTER_BACKGROUND.png",
+        "current SKU `palette_reference`",
+        "Do not send the authoritative product image to Image Gen",
+        "Do not send the current SKU product artwork to Image Gen",
+        "Public API capabilities are not production authority for this Skill",
+    ]:
+        assert needle in skill, needle
+    assert "num_last_images_to_include =" not in skill
+
+    with tempfile.TemporaryDirectory(prefix="md3-release-contract-") as temp:
+        release_root = Path(temp)
+        master = release_root / "master.png"
+        sku_same = release_root / "sku-same.png"
+        sku_other = release_root / "sku-other.png"
+        wrong_ratio = release_root / "wrong-ratio.png"
+        Image.new("RGB", (300, 400), "white").save(master)
+        Image.new("RGBA", (300, 400), (230, 240, 255, 255)).save(sku_same)
+        Image.new("RGB", (600, 800), "white").save(sku_other)
+        Image.new("RGB", (400, 400), "white").save(wrong_ratio)
+
+        raster = json.loads(run(
+            "validate_raster.py", "master", "--generated-background", str(master)
+        ))
+        assert raster["status"] == "MASTER_RASTER_VALID"
+        same = json.loads(run(
+            "validate_raster.py", "sku",
+            "--master-background", str(master),
+            "--generated-background", str(sku_same),
+        ))
+        assert same["status"] == "SKU_RASTER_VALID"
+        mismatch = must_fail(
+            "validate_raster.py", "sku",
+            "--master-background", str(master),
+            "--generated-background", str(sku_other),
+        )
+        assert "SKU_BACKGROUND_SIZE_MISMATCH" in mismatch
+        assert "MASTER_BACKGROUND_NOT_3_4" in must_fail(
+            "validate_raster.py", "master", "--generated-background", str(wrong_ratio)
+        )
+
+        source = release_root / "palette-source.png"
+        source_image = Image.new("RGBA", (160, 120), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(source_image)
+        draw.rectangle((10, 10, 80, 110), fill=(245, 110, 35, 255))
+        draw.rectangle((80, 10, 150, 110), fill=(245, 225, 185, 255))
+        draw.rectangle((55, 35, 105, 85), fill=(25, 30, 35, 255))
+        source_image.save(source)
+        product_dir = release_root / "Palette Product"
+        (product_dir / "reusable").mkdir(parents=True)
+        first = json.loads(run(
+            "palette_cache.py", "--source", str(source),
+            "--product-dir", str(product_dir), "--role", "MASTER"
+        ))
+        second = json.loads(run(
+            "palette_cache.py", "--source", str(source),
+            "--product-dir", str(product_dir), "--role", "MASTER"
+        ))
+        assert first["created"] is True
+        assert second["created"] is False
+        assert first["palette_json_sha256"] == second["palette_json_sha256"]
+        assert first["palette_reference_sha256"] == second["palette_reference_sha256"]
+
+    print("md3-product-image release contract checks passed")
+
+
 if __name__ == "__main__":
     main()
+    release_contract_checks()
