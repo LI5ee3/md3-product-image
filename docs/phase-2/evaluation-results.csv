@@ -1,4 +1,0 @@
-fixture_id,run_type,variant,final_composite_sha256,resolved_width,resolved_height,background_quality,classic_md3_adherence,palette_harmony,safe_zone_cleanliness,sku_composition_consistency,unwanted_product_copying,product_like_geometry,accidental_text_or_logo,unexpected_physical_environment,decision,notes
-watch-fit-5-pro-black,MASTER,structured,372fd70aad99b4812ce026b37f4c3a051db253522872e70c9cee617d4ade9a4f,1086,1448,5,4,4,5,,0,0,0,0,PASS_PROMOTE,Quieter and more reusable than v2.0 baseline
-watch-fit-5-pro-orange,SKU,structured,cc948573309fd750eca3fff050c56d1eeeded87f3a6fc0225d800ea63fe0f091,1086,1448,5,4,5,5,5,0,0,0,0,PASS,Strong warm palette migration with stable master composition
-watch-fit-5-pro-white,SKU,structured,172d48ef27136c43727e81e1ee0c910d6bfaed20960c784544f57bb6ba3ee19e,1086,1448,5,4,4,5,5,0,0,0,0,PASS,Stable cool palette and composition; product/background separation remains acceptable
