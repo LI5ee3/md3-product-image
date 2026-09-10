@@ -12,8 +12,11 @@ Image Gen 只负责生成空背景；产品、固定 50° 二维投影、源 Log
 - MASTER 接受任意严格 3:4 的实际 Image Gen raster；用户锁定后，该实际宽高成为该产品所有 SKU 的硬约束。
 - SKU 背景必须与已锁定 MASTER 的实际宽高完全一致；同为 3:4 但尺寸不同也会确定性失败，不自动重试或放大。
 - 产品颜色通过本地确定性 `palette-reference.png` 提供给 Image Gen；完整产品图保留在本地用于最终合成，不作为配色参考发送给 Image Gen。
+- 色板分析按“产品材质色”处理：智能手表排除屏幕/表盘内容，只保留表带、表壳/边框等外观材质；手机/平板正面排除屏幕内容，只保留物理边框，背面/侧面则保留背板与边框。显示区域由多模态语义识别提供归一化排除框，本地脚本再按产品包围盒向外扩 2% 后确定性过滤，不使用颜色启发式猜屏幕。
+- 提取出的材质色板会进一步生成“安全背景色 / 禁止背景色”指导，供 prompt builder 自动注入。目标不是让背景机械复刻产品主色，而是在保留 MD3 气质的前提下与产品保持最小明度分离，并避免背景主色与产品材质色过度接近。
+- SKU 色板缓存同时绑定源图 SHA-256 与显示区域排除策略；同一源图采用不同排除策略时不会误复用同一缓存。
 - MASTER 的 Image Gen 引用仅为 `palette-reference.png`。
-- SKU 的 Image Gen 引用仅为 `ORIGINAL_MASTER_BACKGROUND.png` + 当前 SKU 的 `palette-reference.png`。
+- SKU 的 Image Gen 引用仅为 `ORIGINAL_MASTER_BACKGROUND.png` + 当前 SKU 的 `palette-reference.png`。同时 `reusable/current-sku-palette.json` 会记录当前 SKU 的色板元数据，供 prompt builder 读取背景分离指导。
 - Work 运行时通过显式 `referenced_image_paths` 传入权威参考图；`num_last_images_to_include` 完全省略。
 - 当前已验证的 Work + Skill 接口不直接暴露 model、quality、resolution、background/transparency、output format 或 edit/action 选择器，因此 Skill 不推断或硬编码这些公开 API 参数。
 - SKU 使用“母版背景作为构图参考 + SKU 色板作为颜色参考”的新背景生成路径，不把现有背景编辑语义当作生产能力。

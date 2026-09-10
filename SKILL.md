@@ -50,9 +50,20 @@ The script creates `PRODUCT_DIRECTORY/reusable/layout.json`, the cropped Logo, a
 
 Treat the canvas recorded by `measure_text.py` as logical normalized layout coordinates. `compose_image.py` applies those normalized positions to the actual 3:4 raster delivered by Image Gen.
 
-### 2. Prepare or verify the deterministic palette reference
+### 2. Prepare or verify the deterministic material palette reference
 
-Image Gen must not receive the complete product artwork merely to learn colors.
+Image Gen must not receive the complete product artwork merely to learn colors. Palette analysis must represent product material colors, not active display content.
+
+Before invoking `palette_cache.py`, inspect the authoritative product image semantically. If a visible electronic display is present, identify each visible display-content rectangle in source-image normalized coordinates `x0,y0,x1,y1` and pass it with a repeatable `--exclude-box` argument. Do not derive display exclusions from color or histogram heuristics.
+
+Apply these category rules:
+
+- Smartwatch / watch with a display: exclude the visible screen/display surface; keep strap, case, bezel/frame, crown, and other exterior hardware eligible.
+- Phone / tablet front view: exclude the visible screen/display surface; keep the physical frame/bezel eligible.
+- Phone / tablet back or side view with no visible display content: do not add a display exclusion. Back cover and frame remain eligible.
+- Multiple visible displays: pass one `--exclude-box` per display.
+
+The extractor expands every supplied display rectangle by 2% of the visible product bounding box on each axis before sampling. This suppresses anti-aliased screen edges, glow, and nearby display-content spill while leaving surrounding product materials available.
 
 For a MASTER, run:
 
@@ -60,7 +71,8 @@ For a MASTER, run:
 python scripts/palette_cache.py \
   --source <authoritative-product.png-or-webp> \
   --product-dir <PRODUCT_DIRECTORY> \
-  --role MASTER
+  --role MASTER \
+  [--exclude-box <x0,y0,x1,y1>] ...
 ```
 
 This creates or verifies:
@@ -76,18 +88,19 @@ For an SKU, run:
 python scripts/palette_cache.py \
   --source <current-SKU.png-or-webp> \
   --product-dir <PRODUCT_DIRECTORY> \
-  --role SKU
+  --role SKU \
+  [--exclude-box <x0,y0,x1,y1>] ...
 ```
 
-SKU palette assets are cached by the exact source SHA-256 under:
+SKU palette assets are cached under:
 
 ```text
 PRODUCT_DIRECTORY/reusable/palettes/
 ```
 
-Use the `palette_reference` path returned by `palette_cache.py` as the only SKU color reference. Identical source pixels must resolve to the same cached palette asset. Never silently replace or reuse a palette cache whose source identity or deterministic output hash does not verify.
+Cache identity is the exact source SHA-256 plus the semantic display-exclusion policy when exclusions are present. The same source pixels with different display exclusions must not resolve to the same SKU cache. For a fixed MASTER cache path, a verified source with a changed exclusion policy is deterministically refreshed and reported as `refreshed_for_policy: true`. Never reuse a cache whose source identity or reference hash does not verify.
 
-The palette extractor is local and deterministic. Transparent pixels below the fixed alpha threshold do not contribute to palette selection. The generated palette reference contains color bands only—no product silhouette, Logo, text, label, icon, packaging, or hardware geometry.
+Use the `palette_reference` path returned by `palette_cache.py` as the only SKU color reference. The palette extractor is local and deterministic after the semantic display rectangles have been supplied. Transparent pixels below the fixed alpha threshold and pixels inside expanded display exclusions do not contribute to palette selection. The generated palette reference contains color bands only—no screen UI, product silhouette, Logo, text, label, icon, packaging, or hardware geometry. The extractor also writes structured background-separation guidance derived from the product material colors: a dominant material color, preferred safe background colors, forbidden near-collision colors, and a minimum lightness-separation rule.
 
 The authoritative product image remains available locally for the final product composite; palette extraction does not replace or alter the source product artwork.
 
@@ -114,10 +127,11 @@ The prompt order is:
 1. current `references/image-gen-prompt.md`
 2. fixed SKU edit block for SKU only
 3. merged information safe-zone block
-4. every user-supplied accumulated addition from `reusable/prompt-additions.json`
-5. canonical product and shadow placement policy
+4. dynamic background-separation block derived from the current material palette
+5. every user-supplied accumulated addition from `reusable/prompt-additions.json`
+6. canonical product and shadow placement policy
 
-The merged safe rectangle contains the measured Logo, every title line, and optional version rectangle, expands the union by 5% of the logical canvas on every side, and clips it to the canvas. It is the only mandatory empty zone.
+The merged safe rectangle contains the measured Logo, every title line, and optional version rectangle, expands the union by 5% of the logical canvas on every side, and clips it to the canvas. It is the only mandatory empty zone. Separately, the dynamic background-separation block instructs Image Gen to keep the backdrop visually distinct from the product material colors. This is a color-separation policy only, not a second geometric safe zone.
 
 Prompt additions persist by exact complete product name and accumulate chronologically across the master and all SKUs. Add text only when the user supplies it with a redo instruction. If no addition has ever been supplied, rebuild from the original prompt plus the required SKU, safe-zone, and canonical blocks. Never invent a correction.
 
@@ -128,7 +142,7 @@ For an SKU, send exactly two Image Gen references:
 1. `reusable/ORIGINAL_MASTER_BACKGROUND.png` as the authoritative composition reference
 2. the verified current SKU `palette_reference` returned by `palette_cache.py` as the color-only palette reference
 
-Do not send the current SKU product artwork to Image Gen. It remains local and authoritative for deterministic product composition.
+Do not send the current SKU product artwork to Image Gen. It remains local and authoritative for deterministic product composition. After `palette_cache.py` completes for an SKU, write `PRODUCT_DIRECTORY/reusable/current-sku-palette.json` pointing to the exact current cached palette JSON and reference PNG. `scene_prompt.py build --mode SKU` must read this pointer and use its background-separation guidance.
 
 At the callable boundary, always use `referenced_image_paths` with only the exact reference files defined above. Omit `num_last_images_to_include` entirely; do not pass `0`, `null`, or another value together with explicit paths. The tested Work Image Gen interface treats `referenced_image_paths` and `num_last_images_to_include` as mutually exclusive.
 

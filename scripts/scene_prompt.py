@@ -12,6 +12,7 @@ SKILL_DIR = Path(__file__).resolve().parent.parent
 IMAGE_PROMPT_REFERENCE = SKILL_DIR / "references" / "image-gen-prompt.md"
 PROMPT_ADDITIONS_NAME = "prompt-additions.json"
 FINAL_SAFE_ZONE_MARGIN = 0.05
+CURRENT_SKU_PALETTE_NAME = "current-sku-palette.json"
 PRODUCT_AREA_POLICY = """Product and shadow placement policy:
 FINAL_INFORMATION_SAFE_ZONE is the only area that must be empty.
 Do not create or interpret any product or shadow area as another empty or unobstructed safe zone, including any previous temporary correction that requested one.
@@ -90,6 +91,51 @@ def load_layout(path: Path) -> tuple[dict, Path]:
     return layout, product_dir
 
 
+
+
+def load_palette_payload(product_dir: Path, mode: str) -> dict:
+    reusable = product_dir / "reusable"
+    if mode == "MASTER":
+        palette_path = reusable / "palette.json"
+    else:
+        pointer_path = reusable / CURRENT_SKU_PALETTE_NAME
+        if not pointer_path.exists():
+            raise ValueError("CURRENT_SKU_PALETTE_POINTER_MISSING")
+        pointer = read_json(pointer_path)
+        try:
+            palette_path = Path(pointer["palette_json"]).expanduser().resolve()
+        except (KeyError, TypeError) as exc:
+            raise ValueError("CURRENT_SKU_PALETTE_POINTER_INVALID") from exc
+    if not palette_path.exists():
+        raise ValueError("PALETTE_JSON_MISSING")
+    payload = read_json(palette_path)
+    guidance = payload.get("background_guidance")
+    if not isinstance(guidance, dict):
+        raise ValueError("BACKGROUND_GUIDANCE_MISSING")
+    return payload
+
+
+def background_separation_block(palette_payload: dict, mode: str) -> str:
+    guidance = palette_payload["background_guidance"]
+    dominant = guidance["dominant_material_color"]
+    constraints = guidance["constraints"]
+    preferred = guidance.get("preferred_background_colors") or []
+    forbidden = guidance.get("forbidden_background_colors") or []
+
+    preferred_text = ", ".join(entry["hex"] for entry in preferred[:3])
+    forbidden_text = ", ".join(entry["hex"] for entry in forbidden[:4])
+    return "\n".join((
+        f"Background separation policy for {mode}:",
+        f"- Dominant material color: {dominant['hex']} (L* {dominant['lightness_lstar']:.1f}, hue {dominant['hue_degrees']:.1f}°).",
+        f"- Keep the background visually separated from the product with a minimum lightness difference of at least ΔL* {constraints['minimum_lightness_delta_lstar']:.1f} relative to the dominant material color.",
+        f"- Avoid same-family background colors whose dominant tone falls within ±{constraints['avoid_lightness_window_lstar']:.1f} L* of the product or that visually blends into the product edges.",
+        f"- If the background stays in the same hue family, keep the hue difference within about ±{constraints['same_hue_max_difference_degrees']:.1f}° only when the background is clearly lighter or darker and noticeably less saturated.",
+        f"- Prefer restrained MD3 backdrop colors such as: {preferred_text}.",
+        f"- Do not center the backdrop on colors too close to the product materials, including: {forbidden_text}.",
+        "- Prioritize product edge readability over literal color matching. If needed, desaturate, brighten, darken, or slightly hue-shift the background to preserve clean separation.",
+    ))
+
+
 def additions_from(path: Path) -> list[str]:
     if not path.exists():
         return []
@@ -130,10 +176,13 @@ def build_prompt(args: argparse.Namespace) -> None:
         additions.append(addition)
         atomic_write(additions_path, additions)
 
+    palette_payload = load_palette_payload(product_dir, args.mode)
+
     parts = [image_prompt()]
     if args.mode == "SKU":
         parts.append(SKU_EDIT_BLOCK)
     parts.append(information_safe_zone_block(layout))
+    parts.append(background_separation_block(palette_payload, args.mode))
     increment = additions_block(additions)
     if increment:
         parts.append(increment)
