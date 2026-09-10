@@ -11,7 +11,6 @@ from common import atomic_write, read_json, verify_information_assets, verify_ma
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 IMAGE_PROMPT_REFERENCE = SKILL_DIR / "references" / "image-gen-prompt.md"
-VARIANT_REFERENCE = SKILL_DIR / "references" / "replace-variant-block.md"
 PROMPT_ADDITIONS_NAME = "prompt-additions.json"
 SKU_TARGET_PATTERN = re.compile(r"SKU_VARIANT-([A-Z]+)")
 FINAL_SAFE_ZONE_MARGIN = 0.05
@@ -20,21 +19,7 @@ FINAL_INFORMATION_SAFE_ZONE is the only area that must be empty.
 Do not create or interpret any product or shadow area as another empty or unobstructed safe zone, including any previous temporary correction that requested one.
 Simple, low-detail MD3 cards and their restrained elevation shadows may appear behind the future local product and may receive its local cast shadow.
 Avoid only dominant high-contrast edges or dense detail that visibly competes with the product after local compositing."""
-
-
-def fenced_block(path: Path, heading: str) -> str:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise ValueError(f"REFERENCE_UNREADABLE: {path}: {exc}") from exc
-    match = re.search(
-        rf"^#{{1,6}} {re.escape(heading)}\s*$.*?^```text\s*$\n(.*?)^```\s*$",
-        text,
-        re.MULTILINE | re.DOTALL,
-    )
-    if not match:
-        raise ValueError(f"REFERENCE_BLOCK_MISSING: {heading}")
-    return match.group(1).rstrip()
+SKU_EDIT_BLOCK = """Use ORIGINAL_MASTER_BACKGROUND as the authoritative composition reference and SKU_PALETTE_REFERENCE only as the authoritative color reference. Keep the background composition unchanged and adapt only its colors to SKU_PALETTE_REFERENCE. Do not infer or copy any product identity, geometry, silhouette, screen, strap, label, icon, branding, text, or packaging from the palette reference. Generate the empty background plate only. Do not add any product, product shadow, Logo, or text."""
 
 
 def image_prompt() -> str:
@@ -215,7 +200,7 @@ def build_prompt(args: argparse.Namespace) -> None:
 
     parts = [image_prompt()]
     if args.mode == "SKU":
-        parts.append(fenced_block(VARIANT_REFERENCE, "SKU edit block"))
+        parts.append(SKU_EDIT_BLOCK)
     parts.append(information_safe_zone_block(layout))
     increment = additions_block(additions)
     if increment:

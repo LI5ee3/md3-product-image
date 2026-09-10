@@ -5,10 +5,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scene_prompt import SKU_EDIT_BLOCK
+
 
 ROOT = Path(__file__).resolve().parent.parent
 ACTIVE = ROOT / "references" / "image-gen-prompt.md"
 BASELINE = ROOT / "references" / "image-gen-prompt-v2-baseline.txt"
+LEGACY_SKU_EDIT_BLOCK = """Use ORIGINAL_MASTER_BACKGROUND as the authoritative composition reference and SKU_PALETTE_REFERENCE only as the authoritative color reference. Keep the background composition unchanged and adapt only its colors to SKU_PALETTE_REFERENCE. Do not infer or copy any product identity, geometry, silhouette, screen, strap, label, icon, branding, text, or packaging from the palette reference. Generate the empty background plate only. Do not add any product, product shadow, Logo, or text."""
 
 
 def main() -> None:
@@ -47,6 +50,9 @@ def main() -> None:
     )
     assert "DELIVERABLE" not in baseline
     assert active != baseline
+
+    assert SKU_EDIT_BLOCK == LEGACY_SKU_EDIT_BLOCK
+    assert not (ROOT / "references" / "replace-variant-block.md").exists()
 
     print("md3-product-image structured palette-only prompt self-check passed")
 
