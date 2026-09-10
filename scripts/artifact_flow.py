@@ -24,7 +24,6 @@ from common import (
     read_json,
     require_matching_raster,
     require_three_four_raster,
-    resolve_entry,
     sha256_file,
     verify_information_assets,
     verify_master,
@@ -193,15 +192,9 @@ def create_preview(args: argparse.Namespace) -> None:
             "schema": 1,
             "kind": "MASTER_CANDIDATE_PREVIEW",
             "candidate_id": candidate_id,
-            "files": {
-                "layout": relative_entry(layout_path, product_dir),
-                "background": relative_entry(paths["background"], product_dir),
-                "product": relative_entry(paths["product"], product_dir),
-                "shadow": relative_entry(paths["shadow"], product_dir),
-                "scene": relative_entry(paths["scene"], product_dir),
-                "final": relative_entry(paths["final"], product_dir),
-            },
             "raster": raster,
+            "background_sha256": sha256_file(paths["background"]),
+            "final_sha256": sha256_file(paths["final"]),
             "information": information,
             "scene_composite": scene_render,
         }
@@ -218,22 +211,13 @@ def load_preview(product_dir: Path, candidate_id: str) -> tuple[dict, dict[str, 
     manifest = read_json(paths["manifest"])
     if manifest.get("kind") != "MASTER_CANDIDATE_PREVIEW" or manifest.get("candidate_id") != candidate_id:
         raise ValueError("PREVIEW_MANIFEST_INVALID")
-    files = manifest.get("files")
-    if not isinstance(files, dict):
-        raise ValueError("PREVIEW_MANIFEST_INVALID")
-    expected = {
-        "layout": product_dir / "reusable" / "layout.json",
-        "background": paths["background"],
-        "product": paths["product"],
-        "shadow": paths["shadow"],
-        "scene": paths["scene"],
-        "final": paths["final"],
-    }
-    for label, path in expected.items():
-        resolve_entry(files.get(label), product_dir, path, label)
     raster = normalize_raster_contract(manifest.get("raster"), "PREVIEW_RASTER")
     for label in ("background", "product", "shadow", "scene", "final"):
-        require_matching_raster(expected[label], raster, f"PREVIEW_{label.upper()}")
+        require_matching_raster(paths[label], raster, f"PREVIEW_{label.upper()}")
+    for label in ("background", "final"):
+        expected_hash = manifest.get(f"{label}_sha256")
+        if not isinstance(expected_hash, str) or sha256_file(paths[label]) != expected_hash:
+            raise ValueError(f"PREVIEW_{label.upper()}_HASH_MISMATCH")
     manifest = dict(manifest)
     manifest["raster"] = raster
     return manifest, paths

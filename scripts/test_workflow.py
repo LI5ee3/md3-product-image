@@ -92,6 +92,10 @@ def main() -> None:
         preview = json.loads(run("artifact_flow.py", "preview", "--generated-background", str(background), "--product", str(product), "--product-dir", str(product_dir), "--candidate-id", "01"))
         assert preview["information"] == {"title_color": "2C2C2C", "version_color": "5A5A5A"}
         assert "scene_attempt" not in preview
+        preview_manifest = json.loads((product_dir / "master-candidate-01-preview.json").read_text(encoding="utf-8"))
+        assert "files" not in preview_manifest
+        assert preview_manifest["background_sha256"] == sha256(product_dir / "master-candidate-01-preview-background.png")
+        assert preview_manifest["final_sha256"] == sha256(product_dir / "master-candidate-01-preview.png")
         cached_product = reusable / "master-candidate-01-product.png"
         cached_shadow = reusable / "master-candidate-01-shadow.png"
         cached_hashes = (sha256(cached_product), sha256(cached_shadow))
@@ -105,6 +109,11 @@ def main() -> None:
 
         run("artifact_flow.py", "preview", "--generated-background", str(second_background), "--product", str(product), "--product-dir", str(product_dir), "--candidate-id", "01")
         assert cached_hashes == (sha256(cached_product), sha256(cached_shadow))
+        final_preview = product_dir / "master-candidate-01-preview.png"
+        final_preview_bytes = final_preview.read_bytes()
+        Image.new("RGB", (300, 400), "black").save(final_preview)
+        assert "PREVIEW_FINAL_HASH_MISMATCH" in must_fail("artifact_flow.py", "bind", "--product-dir", str(product_dir), "--candidate-id", "01")
+        final_preview.write_bytes(final_preview_bytes)
         run("artifact_flow.py", "bind", "--product-dir", str(product_dir), "--candidate-id", "01")
         master = reusable / "master.json"
         assert master.is_file()
