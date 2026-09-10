@@ -81,7 +81,7 @@ def main() -> None:
             "--title-lines", "2",
             "--title-line-1", "Pixel by",
             "--title-line-2", "Google",
-            "--version", "Pro",
+            "--version", "Глобальная версия",
             "--product-reference", str(product),
             "--logo", str(logo),
             "--output-root", str(root / "products"),
@@ -93,6 +93,9 @@ def main() -> None:
         assert layout.is_file() and (reusable / "logo.png").is_file()
         assert report["product_reference"]["format"] == "WEBP"
         assert report["title_lines"] == ["Pixel by", "Google"]
+        assert report["version"] == "Глобальная версия"
+        assert report["font"]["name"] == "Rubik Variable"
+        assert report["font"]["weight"] == 700
 
         prompt = scene_prompt("build", layout, "MASTER", target="01")
         assert "FINAL_INFORMATION_SAFE_ZONE" in prompt

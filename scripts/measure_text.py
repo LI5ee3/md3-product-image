@@ -11,7 +11,32 @@ from PIL import Image, ImageDraw, ImageFont
 
 from common import atomic_write, sha256_file
 
-FONT_DEFAULT = Path(__file__).resolve().parent.parent / "assets" / "Roboto-Bold.ttf"
+FONT_DEFAULT = Path(__file__).resolve().parent.parent / "assets" / "Rubik[wght].ttf"
+FONT_WEIGHT_DEFAULT = 700
+
+
+def load_font(
+    font_path: Path, size: int, weight: int
+) -> ImageFont.FreeTypeFont:
+    font = ImageFont.truetype(str(font_path), size)
+    try:
+        axes = font.get_variation_axes()
+    except OSError:
+        axes = []
+    if axes:
+        if len(axes) != 1:
+            raise ValueError(
+                f"FONT_VARIATION_UNSUPPORTED: expected one axis, found {len(axes)}"
+            )
+        axis = axes[0]
+        minimum = int(axis["minimum"])
+        maximum = int(axis["maximum"])
+        if not minimum <= weight <= maximum:
+            raise ValueError(
+                f"FONT_WEIGHT_OUT_OF_RANGE: {weight} not in {minimum}..{maximum}"
+            )
+        font.set_variation_by_axes([weight])
+    return font
 
 
 def mask_signature(font: ImageFont.FreeTypeFont, text: str) -> tuple:
@@ -19,9 +44,9 @@ def mask_signature(font: ImageFont.FreeTypeFont, text: str) -> tuple:
     return mask.size, mask.getbbox(), bytes(mask)
 
 
-def check_glyph_coverage(font_path: Path, *texts: str) -> None:
+def check_glyph_coverage(font_path: Path, weight: int, *texts: str) -> None:
     """Reject characters rendered as the font's missing-glyph box."""
-    font = ImageFont.truetype(str(font_path), 96)
+    font = load_font(font_path, 96, weight)
     missing = mask_signature(font, "\U0010ffff")
     absent = sorted(
         {
@@ -52,13 +77,13 @@ def render_text_mask(font: ImageFont.FreeTypeFont, text: str) -> Image.Image:
 
 
 def font_for_lines_height(
-    font_path: Path, lines: list[str], target_height: int
+    font_path: Path, lines: list[str], target_height: int, weight: int
 ) -> ImageFont.FreeTypeFont:
     lo, hi = 1, max(16, target_height * 4)
     candidates: list[tuple[int, int, ImageFont.FreeTypeFont]] = []
     while lo <= hi:
         size = (lo + hi) // 2
-        font = ImageFont.truetype(str(font_path), size)
+        font = load_font(font_path, size, weight)
         height = max(render_text_mask(font, line).height for line in lines)
         candidates.append((abs(height - target_height), size, font))
         if height < target_height:
@@ -169,6 +194,7 @@ class LayoutOptions:
     max_title_width_frac: float = 0.90
     line_gap_factor: float = 0.45
     font_path: Path = field(default_factory=lambda: FONT_DEFAULT)
+    font_weight: int = FONT_WEIGHT_DEFAULT
 
 
 def resolve_title_lines(
@@ -191,7 +217,9 @@ def resolve_title_lines(
 
     rendered_title = "\n".join(lines)
     target_height = round(opts.title_height_frac * canvas_height)
-    title_font = font_for_lines_height(opts.font_path, lines, target_height)
+    title_font = font_for_lines_height(
+        opts.font_path, lines, target_height, opts.font_weight
+    )
     if any(
         render_text_mask(title_font, line).width
         > opts.max_title_width_frac * canvas_width
@@ -252,7 +280,9 @@ def clear_zones(
 
 
 def prepare_layout(args: argparse.Namespace) -> dict:
-    opts = LayoutOptions(font_path=Path(args.font_path))
+    opts = LayoutOptions(
+        font_path=Path(args.font_path), font_weight=args.font_weight
+    )
     if not opts.font_path.is_file():
         raise FileNotFoundError(f"FONT_UNAVAILABLE: {opts.font_path}")
     if args.canvas_height <= 0 or args.canvas_height % 4:
@@ -261,6 +291,7 @@ def prepare_layout(args: argparse.Namespace) -> dict:
     width, height = args.canvas_height * 3 // 4, args.canvas_height
     check_glyph_coverage(
         opts.font_path,
+        opts.font_weight,
         args.title_line_1,
         args.title_line_2 or "",
         args.version or "",
@@ -318,6 +349,7 @@ def prepare_layout(args: argparse.Namespace) -> dict:
             opts.font_path,
             [args.version],
             round(opts.version_height_frac * height),
+            opts.font_weight,
         )
         version_mask = render_text_mask(version_font, args.version)
         version_asset = "version-mask.png"
@@ -380,7 +412,11 @@ def prepare_layout(args: argparse.Namespace) -> dict:
             "ratio": "3:4",
             "purpose": "logical layout only",
         },
-        "font": {"path": str(opts.font_path), "name": "Roboto Bold"},
+        "font": {
+            "path": str(opts.font_path),
+            "name": "Rubik Variable",
+            "weight": opts.font_weight,
+        },
         "product_reference": product_metadata,
         "logo": logo_metadata,
         "title_line_count": args.title_lines,
@@ -417,6 +453,7 @@ def main() -> None:
     )
     parser.add_argument("--canvas-height", type=int, default=2048)
     parser.add_argument("--font-path", default=str(FONT_DEFAULT))
+    parser.add_argument("--font-weight", type=int, default=FONT_WEIGHT_DEFAULT)
     args = parser.parse_args()
 
     try:
